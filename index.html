@@ -32,13 +32,13 @@
   color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.55;
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
 .wrap{max-width:1180px;margin:0 auto;display:grid;gap:18px}
-header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
-header p{margin:4px 0 0;color:var(--muted);max-width:72ch}
-.sample-note{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:10px;font-size:13px;padding:8px 12px;border-radius:6px;background:var(--dup-bg);color:var(--fg);border:1px solid var(--dup-line)}
-.samplechip{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--dup-bg);color:var(--dup);border:1px solid var(--dup-line);white-space:nowrap}
+header h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);word-break:keep-all}
+.sample-note{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:10px;font-size:15px;padding:8px 12px;border-radius:6px;background:var(--dup-bg);color:var(--fg);border:1px solid var(--dup-line)}
+.samplechip{font-size:12.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--dup-bg);color:var(--dup);border:1px solid var(--dup-line);white-space:nowrap}
 .start{display:grid;gap:14px;padding:8px 4px}
 .start ol{margin:0;padding-left:22px;display:grid;gap:6px;max-width:72ch}
 .start .row{align-items:center}
@@ -46,10 +46,10 @@ header p{margin:4px 0 0;color:var(--muted);max-width:72ch}
 .panel{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--fc,var(--line));border-radius:8px;padding:14px;display:grid;gap:10px;min-width:0;align-content:start}
 .panel.add{border-style:dashed;border-top-width:1px;background:transparent}
 .panel.add.only{grid-column:1/-1}
-.panel.add.only .drop{padding:36px 14px;font-size:15px}
-.samplerow{align-items:center;justify-content:center}
-.tag{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 5px;font-family:var(--mono);font-size:15px;font-weight:700;line-height:1;border-radius:5px;background:var(--fc,var(--muted));color:var(--accent-ink);white-space:nowrap;vertical-align:middle}
-.tabs .tag,th .tag{min-width:20px;height:20px;font-size:13px;margin-right:5px}
+.panel.add.only .drop{padding:36px 14px;font-size:18px}
+.row.samplerow{align-items:center;justify-content:center}
+.tag{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 5px;font-family:var(--mono);font-size:16px;font-weight:700;line-height:1;border-radius:5px;background:var(--fc,var(--muted));color:var(--accent-ink);white-space:nowrap;vertical-align:middle}
+.tabs .tag,th .tag{min-width:22px;height:22px;font-size:14px;margin-right:5px}
 .refs span{font-weight:700}
 .panel-head{display:flex;align-items:center;gap:8px;min-width:0}
 .panel-head .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
@@ -57,18 +57,18 @@ header p{margin:4px 0 0;color:var(--muted);max-width:72ch}
 .drop:hover,.drop.over{border-color:var(--accent);background:var(--a-soft);color:var(--fg)}
 .drop strong{color:var(--accent)}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
-label.f{display:grid;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+label.f{display:grid;gap:3px;font-size:14px;color:var(--muted);min-width:0}
 label.f > span{display:flex;gap:6px;align-items:center;min-width:0}
-select,input[type=number],input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:5px 8px;min-width:0;max-width:100%}
-input[type=number]{width:72px}
-input[type=text]{width:140px}
+select,input[type=number],input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 9px;min-width:0;max-width:100%}
+input[type=number]{width:80px}
+input[type=text]{width:150px}
 select:focus-visible,input:focus-visible,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.meta{font-size:12px;color:var(--muted)}
+.meta{font-size:14px;color:var(--muted)}
 section.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:12px;min-width:0}
-h2{margin:0;font-size:15px;font-weight:700}
+h2{margin:0;font-size:18px;font-weight:700}
 .items{display:grid;gap:10px}
 .item{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:8px;background:var(--bg)}
-.item-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px}
+.item-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:15px}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px 12px}
 .fgrid select{width:100%}
 button{font:inherit;cursor:pointer;border-radius:5px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:6px 12px}
@@ -77,13 +77,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
 button.ghost{border-color:transparent;color:var(--muted);padding:4px 8px;background:transparent}
 button.ghost:hover{color:var(--danger);border-color:transparent}
-button.small{padding:3px 9px;font-size:12px}
+button.small{padding:3px 9px;font-size:14px}
 .opts{display:flex;flex-wrap:wrap;gap:6px 16px}
-.opts label{display:flex;gap:6px;align-items:center;font-size:13px}
+.opts label{display:flex;gap:6px;align-items:center;font-size:15px}
 .summary{display:flex;flex-wrap:wrap;gap:10px}
 .stat{flex:1 1 140px;border:1px solid var(--line);border-top:3px solid var(--fc,var(--line));border-radius:6px;padding:10px 12px;background:var(--bg);min-width:0}
-.stat .k{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.stat .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .k{font-size:14px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat .v{font-size:27px;font-weight:700;font-variant-numeric:tabular-nums}
 .stat.hot{border-color:var(--dup-line);background:var(--dup-bg)}
 .stat.hot .v{color:var(--dup)}
 .stat.near{border-color:var(--accent);background:var(--a-soft)}
@@ -93,21 +93,21 @@ button.small{padding:3px 9px;font-size:12px}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
-.chips button{padding:3px 10px;font-size:13px;border-radius:999px}
+.chips button{padding:3px 10px;font-size:15px;border-radius:999px}
 .chips button[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
 .tbl{overflow:auto;max-height:540px;border:1px solid var(--line);border-radius:6px}
-table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:15px;font-variant-numeric:tabular-nums}
 th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
 th{position:sticky;top:0;background:var(--surface);font-weight:600;z-index:1}
 th.fcol{border-top:3px solid var(--fc)}
 td.num,th.num{font-family:var(--mono);color:var(--muted);text-align:right}
 td.mark{text-align:center}
 tr.dup td{background:var(--dup-bg)}
-.pill{display:inline-block;font-size:12px;font-weight:600;padding:0 8px;border-radius:999px;background:var(--dup);color:var(--surface)}
+.pill{display:inline-block;font-size:14px;font-weight:600;padding:0 8px;border-radius:999px;background:var(--dup);color:var(--surface)}
 .pill.no{background:transparent;color:var(--muted);font-weight:400;padding:0}
 .pill.man{background:var(--accent)}
 .pill.inner{background:transparent;color:var(--dup);border:1px solid var(--dup-line)}
-.refs{font-family:var(--mono);font-size:12px}
+.refs{font-family:var(--mono);font-size:14px}
 .refs span{color:var(--fc)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--fc);vertical-align:middle;margin-right:4px}
 .empty{padding:28px;text-align:center;color:var(--muted)}
@@ -115,21 +115,21 @@ tr.dup td{background:var(--dup-bg)}
 tr.grp1 td{background:var(--a-soft)}
 tr.grp2 td{background:var(--surface)}
 td[rowspan]{vertical-align:middle;border-right:1px solid var(--line)}
-.nearchip{font-size:12px;padding:0 7px;border-radius:4px;background:var(--a-soft);color:var(--accent);font-weight:600}
+.nearchip{font-size:14px;padding:0 7px;border-radius:4px;background:var(--a-soft);color:var(--accent);font-weight:600}
 .hint{border:1px solid var(--dup-line);background:var(--dup-bg);border-radius:6px;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 .linkbtn{border:none;background:none;color:var(--accent);text-decoration:underline;padding:0}
-.count{font-size:11px;font-weight:700;background:var(--dup);color:var(--surface);border-radius:999px;padding:0 6px;margin-left:2px}
+.count{font-size:12.5px;font-weight:700;background:var(--dup);color:var(--surface);border-radius:999px;padding:0 6px;margin-left:2px}
 .simhi{color:var(--dup)}
-td .meta{font-size:12px}
+td .meta{font-size:14px}
 .mapdl{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;justify-content:space-between}
 .mapdl > div:first-child{flex:1 1 280px;min-width:0}
 .hdrbox{display:flex;gap:6px;align-items:center}
-.autochip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--ok-soft);color:var(--ok);cursor:help}
+.autochip{font-size:12.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--ok-soft);color:var(--ok);cursor:help}
 .sheetplan{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
 .sheetplan ol{margin:4px 0 0;padding-left:20px;display:grid;gap:2px}
 .sheetplan b{margin-right:6px}
-.foot{font-size:12px;color:var(--muted);max-width:80ch}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px;z-index:10;max-width:calc(100% - 32px)}
+.foot{font-size:14px;color:var(--muted);max-width:80ch}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:15px;z-index:10;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -138,7 +138,7 @@ td .meta{font-size:12px}
 <div class="wrap">
   <header>
     <h1>대상물 크로스 체크</h1>
-    <p>여러 부서의 엑셀 대상물 목록을 맞대어, 대상물마다 어느 목록에 들어 있는지 찾아 표시합니다. 파일은 2개부터 8개까지 올릴 수 있고, 이 브라우저 안에서만 처리되어 어디에도 전송되지 않습니다.</p>
+    <p>파일은 8개까지 업로드 가능합니다. 올린 파일은 이 브라우저 안에서만 처리되고 외부로 전송되지 않습니다.</p>
     <div class="sample-note" id="sampleNote" hidden><span>지금 보이는 것은 <b>예시 파일</b>입니다. 실제 파일을 올리면 예시는 자동으로 빠집니다.</span><button type="button" class="small" id="clearSample">예시 지우기</button></div>
   </header>
 
@@ -618,8 +618,8 @@ function renderFiles(){
       </div>
       <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.hdrTwo?' · 2줄 머리글':''}${f.mergeFilled?` · 병합 칸 ${f.mergeFilled}개 채움`:''}</span>
     </div>`).join('') + (state.files.length<MAXF ? `<div class="panel add${state.files.length?'':' only'}">
-      <div class="drop" tabindex="0" role="button" id="dropAdd">${state.files.length<2?'비교할 파일을':'파일을 더'} 끌어다 놓거나 <strong>눌러서 선택</strong><div class="meta">엑셀(.xlsx, .xls) 또는 CSV · 여러 개를 한 번에 올려도 됩니다 · 최대 ${MAXF}개</div></div>
-      ${state.files.length===0?`<div class="row samplerow"><button type="button" id="trySample">예시로 둘러보기</button><span class="meta">처음이라면 예방과·대응과·교육팀 가상 목록 3개로 결과 화면을 먼저 볼 수 있습니다.</span></div>`:''}
+      <div class="drop" tabindex="0" role="button" id="dropAdd">${state.files.length<2?'비교할 파일을':'파일을 더'} 끌어다 놓거나 <strong>눌러서 선택</strong><div class="meta">엑셀(.xlsx, .xls) 또는 CSV · 여러 개를 한 번에 올려도 됩니다</div></div>
+      ${state.files.length===0?`<div class="row samplerow"><button type="button" id="trySample">예시로 둘러보기</button><span class="meta">가상 목록 3개로 결과 화면을 먼저 볼 수 있습니다.</span></div>`:''}
     </div>` : '');
   const ts = $('#trySample'); if(ts) ts.addEventListener('click', loadSamples);
   const drop = $('#dropAdd');
@@ -650,7 +650,7 @@ function colSelect(f, val, attrs, withNone){
 }
 function renderItems(){
   const box = $('#items');
-  if(state.files.length<2){ box.innerHTML='<div class="meta">파일을 2개 이상 올리면 비교할 열을 고를 수 있습니다.</div>'; $('#addItem').disabled=true; return; }
+  if(state.files.length<2){ box.innerHTML=''; $('#addItem').disabled=true; return; }
   ensureCols();
   $('#addItem').disabled = false;
   box.innerHTML = Array.from({length:state.nItems},(_,i)=>`<div class="item">
@@ -662,7 +662,7 @@ function renderItems(){
 }
 function renderNear(){
   const box = $('#nearRow');
-  if(state.files.length<2){ box.innerHTML='<span class="meta" style="grid-column:1/-1">파일을 2개 이상 올리면 주소 열을 고를 수 있습니다.</span>'; return; }
+  if(state.files.length<2){ box.innerHTML=''; return; }
   const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'묶지 않음']];
   box.innerHTML = state.files.map((f,fi)=>`<label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 주소 열</span>${colSelect(f, f.addr, `data-fi="${fi}"`, true)}</label>`).join('')
     + `<label class="f"><span>묶음 범위</span><select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
