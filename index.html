@@ -107,6 +107,10 @@ td[rowspan]{vertical-align:middle;border-right:1px solid var(--line)}
 .count{font-size:11px;font-weight:700;background:var(--dup);color:var(--surface);border-radius:999px;padding:0 6px;margin-left:2px}
 .simhi{color:var(--dup)}
 td .meta{font-size:12px}
+.mapdl{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;justify-content:space-between}
+.mapdl > div:first-child{flex:1 1 280px;min-width:0}
+.hdrbox{display:flex;gap:6px;align-items:center}
+.autochip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--b-soft);color:var(--b);cursor:help}
 .sheetplan{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
 .sheetplan ol{margin:4px 0 0;padding-left:20px;display:grid;gap:2px}
 .sheetplan b{margin-right:6px}
@@ -176,7 +180,7 @@ const state = {
   A:null, B:null,
   rules:[],
   near:{a:null,b:null,span:20},
-  fuzzy:0.85, alias:new Map(), rejected:new Set(),
+  fuzzy:0.85, alias:new Map(), rejected:new Set(), mapTeam:'none',
   tab:'list', filter:'all',
   res:null
 };
@@ -222,24 +226,125 @@ async function readFile(file){
   }
   return XLSX.read(buf,{type:'array',cellDates:false});
 }
+/* ---------- 머리글 행 자동 인식 ----------
+   위에서 15행 안의 각 행에 점수를 매겨 가장 머리글다운 행을 고른다.
+   + 채워진 칸이 많을수록 (제목 행은 보통 한 칸뿐)
+   + 짧은 글자일수록 (숫자·날짜·긴 주소는 데이터 쪽)
+   + 머리글에 흔한 단어가 많을수록
+   + 값이 서로 겹치지 않을수록
+   + 바로 아래 행들이 같은 열에 꾸준히 값이 있을수록 (그 아래가 표 본문)
+   - 아래 행과 생김새가 같으면 감점 (그 자체가 데이터 행) */
+const HEAD_WORDS = ['번호','연번','순번','순서','no','구분','이름','성명','명칭','상호','대상','건물','시설','업소','업체','주소','소재지','도로명','지번','위치','동','용도','종류','유형','등급','규모','층','면적','연면적','세대','전화','연락처','대표','관리자','소유자','담당','팀','반','일자','날짜','일시','기간','년도','비고','결과','상태','점검','교육','조사','관리','코드','id','수량','인원'];
+function cellKind(v){
+  const s = String(v ?? '').trim();
+  if(!s) return 'empty';
+  if(/^[-+]?[\d,]+(\.\d+)?%?$/.test(s)) return 'num';
+  if(/^\d{2,4}[-./년]\s*\d{1,2}([-./월]\s*\d{1,2}일?)?\.?$/.test(s)) return 'date';
+  return 'text';
+}
+function detectHeader(aoa){
+  const LIM = Math.min(15, aoa.length);
+  let width = 0;
+  for(let i=0;i<Math.min(aoa.length,60);i++) width = Math.max(width, (aoa[i]||[]).filter(v=>String(v).trim()).length);
+  if(!width) return {idx:0, why:'빈 시트'};
+  let best = {idx:0, score:-1e9};
+  for(let i=0;i<LIM;i++){
+    const row = (aoa[i]||[]).map(v=>String(v ?? '').trim());
+    const cols = row.map((v,c)=>v?c:-1).filter(c=>c>=0);
+    const n = cols.length;
+    if(n===0) continue;
+    if(n<2 && width>=2) continue;
+    const vals = cols.map(c=>row[c]);
+    const kinds = vals.map(cellKind);
+    const textShort = vals.filter((v,k)=>kinds[k]==='text' && v.length<=15).length;
+    const kw = vals.filter(v=>{ const t=v.replace(/\s/g,'').toLowerCase(); return HEAD_WORDS.some(w=> w.length===1 ? t===w : t.includes(w)); }).length;
+    const uniq = new Set(vals).size === n;
+    // 아래 5행: 같은 열에 값이 이어지는지, 생김새가 같은지
+    let fill = 0, same = 0, cnt = 0;
+    for(let j=i+1;j<Math.min(aoa.length,i+6);j++){
+      const nr = (aoa[j]||[]).map(v=>String(v ?? '').trim());
+      if(!nr.some(Boolean)) continue;
+      cnt++;
+      fill += cols.filter(c=>nr[c]).length / n;
+      same += cols.filter(c=>cellKind(nr[c])===kinds[cols.indexOf(c)] && kinds[cols.indexOf(c)]!=='text').length / n;
+    }
+    if(cnt){ fill/=cnt; same/=cnt; }
+    const score = n/width*4 + textShort/n*3 + kw*1.5 + (uniq?1:0) + fill*3 - same*3 - (cnt?0:5);
+    if(score > best.score) best = {idx:i, score, kw, n};
+  }
+  return {idx:best.idx, why: best.kw ? `머리글 단어 ${best.kw}개` : `채워진 칸 ${best.n}개`};
+}
+/* 병합 셀 처리
+   - 머리글 찾기는 병합을 풀기 전 모양으로 한다 (제목 병합이 여러 칸으로 번지면 머리글처럼 보이므로)
+   - 머리글: 병합 범위 전체에 값을 채운 뒤, 머리글 바로 아래 줄이 하위 머리글이면 두 줄을 합친다
+     (예: '소재지' 아래 '도로명/지번' → '소재지 도로명', '소재지 지번')
+   - 데이터: 세로로 병합된 칸만 아래로 채운다 (같은 건물의 여러 업소, 구분 열 등)
+     가로로만 병합된 데이터 칸은 채우지 않는다 (안내문 한 줄이 여러 열로 번지는 것 방지) */
+function sheetMerges(ws, range){
+  return (ws['!merges']||[]).map(m=>({r1:m.s.r-range.s.r, c1:m.s.c-range.s.c, r2:m.e.r-range.s.r, c2:m.e.c-range.s.c}));
+}
+function mergedValue(aoa, merges, r, c){
+  const m = merges.find(m=>r>=m.r1 && r<=m.r2 && c>=m.c1 && c<=m.c2);
+  const v = m ? (aoa[m.r1]||[])[m.c1] : (aoa[r]||[])[c];
+  return String(v ?? '').trim();
+}
+function isSubHeader(aoa, merges, h){
+  const top = aoa[h]||[], sub = aoa[h+1];
+  if(!sub) return false;
+  // 머리글 행에서 시작하는 병합이 아래 줄까지 내려가거나(세로), 여러 열에 걸쳐 있고(가로) 그 아래에 값이 있으면 2줄 머리글
+  const vert = merges.some(m=>m.r1===h && m.r2>h);
+  const horiz = merges.filter(m=>m.r1===h && m.r2===h && m.c2>m.c1);
+  const horizSub = horiz.some(m=>{ for(let c=m.c1;c<=m.c2;c++){ if(String(sub[c]??'').trim()) return true; } return false; });
+  if(!vert && !horizSub) return false;
+  // 아래 줄 값이 머리글처럼 짧은 글자인지 확인 (숫자·날짜가 섞이면 데이터)
+  const vals = sub.map(v=>String(v??'').trim()).filter(Boolean);
+  return vals.length>0 && vals.every(v=>cellKind(v)==='text' && v.length<=15);
+}
 function loadSheet(side){
   const f = state[side];
   const ws = f.wb.Sheets[f.sheet];
   const aoa = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:true});
   const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : {s:{r:0,c:0}};
+  const merges = sheetMerges(ws, range);
   f.startRow = range.s.r;               // 시트의 첫 사용 행(0-based)
-  const h = Math.max(1, f.headerRow) - 1 - f.startRow; // aoa 안에서 머리글 위치
-  const headerArr = aoa[h] || [];
-  let width = headerArr.length;
-  aoa.forEach(r => { if(r.length>width) width=r.length; });
-  f.headers = Array.from({length:width},(_,i)=> String(headerArr[i] ?? '').trim() || XLSX.utils.encode_col(i + range.s.c)+'열');
-  f.colOffset = range.s.c;
-  f.rows = [];
-  for(let i=h+1;i<aoa.length;i++){
-    const r = aoa[i];
-    if(!r || r.every(v => String(v).trim()==='')) continue;
-    f.rows.push({excelRow: f.startRow + i + 1, cells: f.headers.map((_,c)=> r[c] ?? '')});
+  if(f.hdrAuto !== false){
+    const d = detectHeader(aoa);
+    f.headerRow = f.startRow + d.idx + 1;
+    f.hdrAuto = true; f.hdrWhy = d.why;
   }
+  const h = Math.max(0, Math.max(1, f.headerRow) - 1 - f.startRow); // aoa 안에서 머리글 위치
+  let width = 0;
+  aoa.forEach(r => { if(r.length>width) width=r.length; });
+  merges.forEach(m => { if(m.c2+1>width) width=m.c2+1; });
+  const two = isSubHeader(aoa, merges, h);
+  f.hdrTwo = two;
+  f.headers = Array.from({length:width},(_,c)=>{
+    const top = mergedValue(aoa, merges, h, c);
+    const sub = two ? mergedValue(aoa, merges, h+1, c) : '';
+    const name = !sub || sub===top ? top : (!top ? sub : top+' '+sub);
+    return name || XLSX.utils.encode_col(c + range.s.c)+'열';
+  });
+  // 이름이 겹치는 머리글은 뒤에 번호를 붙여 구분
+  const seen = {};
+  f.headers = f.headers.map(n=>{ seen[n]=(seen[n]||0)+1; return seen[n]>1 ? `${n} (${seen[n]})` : n; });
+  f.colOffset = range.s.c;
+  const dataStart = h + (two?2:1);
+  const vmerges = merges.filter(m=>m.r2>m.r1 && m.r2>=dataStart);
+  f.mergeFilled = 0;
+  f.rows = [];
+  for(let i=dataStart;i<aoa.length;i++){
+    const r = aoa[i] || [];
+    const cells = f.headers.map((_,c)=>{
+      const v = r[c] ?? '';
+      if(String(v).trim()!=='') return v;
+      const m = vmerges.find(m=>i>m.r1 && i<=m.r2 && c>=m.c1 && c<=m.c2 && m.r1>=dataStart);
+      if(m){ f.mergeFilled++; return (aoa[m.r1]||[])[m.c1] ?? ''; }
+      return v;
+    });
+    if(cells.every(v => String(v).trim()==='')) continue;
+    f.rows.push({excelRow: f.startRow + i + 1, cells});
+  }
+  if(two) f.hdrWhy = (f.hdrWhy ? f.hdrWhy+' · ' : '') + '2줄 머리글 합침';
 }
 function guessRules(){
   const A = state.A, B = state.B;
@@ -249,6 +354,11 @@ function guessRules(){
   for(const group of syn){
     const a = A.headers.findIndex(h=>group.includes(norm(h)));
     const b = B.headers.findIndex(h=>group.includes(norm(h)));
+    if(a>=0 && b>=0){ state.rules=[{a,b}]; return; }
+  }
+  for(const group of syn){
+    const has = h => group.some(w=>norm(h).includes(w));
+    const a = A.headers.findIndex(has), b = B.headers.findIndex(has);
     if(a>=0 && b>=0){ state.rules=[{a,b}]; return; }
   }
   for(let a=0;a<A.headers.length;a++){
@@ -432,8 +542,8 @@ function renderPanel(side){
     html += `<div class="row">
       <label class="f">부서/구분 이름<input type="text" id="lbl${side}" maxlength="20" value="${esc(f.label)}"></label>
       <label class="f">시트<select id="sheet${side}">${f.wb.SheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
-      <label class="f">머리글 행<input type="number" min="1" id="hdr${side}" value="${f.headerRow}"></label>
-      <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개</span>
+      <label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${side}" value="${f.headerRow}">${f.hdrAuto?`<span class="autochip" title="${esc(f.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost" id="hdrAuto${side}">자동으로</button>`}</span></label>
+      <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.hdrTwo?' · 2줄 머리글':''}${f.mergeFilled?` · 병합 칸 ${f.mergeFilled}개 채움`:''}</span>
     </div>`;
   }
   p.innerHTML = html;
@@ -445,8 +555,10 @@ function renderPanel(side){
   drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over'); if(e.dataTransfer.files[0]) handleFile(side,e.dataTransfer.files[0]);});
   if(f){
     p.querySelector('#lbl'+side).addEventListener('change',e=>{ f.label = e.target.value.trim() || ('파일 '+side); e.target.value=f.label; renderResult(); });
-    p.querySelector('#sheet'+side).addEventListener('change',e=>{ resetDecisions(); f.sheet=e.target.value; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
-    p.querySelector('#hdr'+side).addEventListener('change',e=>{ resetDecisions(); f.headerRow=Math.max(1,parseInt(e.target.value)||1); state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
+    p.querySelector('#sheet'+side).addEventListener('change',e=>{ resetDecisions(); f.sheet=e.target.value; f.hdrAuto=true; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
+    const ab = p.querySelector('#hdrAuto'+side);
+    if(ab) ab.addEventListener('click',()=>{ resetDecisions(); f.hdrAuto=true; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
+    p.querySelector('#hdr'+side).addEventListener('change',e=>{ resetDecisions(); f.headerRow=Math.max(1,parseInt(e.target.value)||1); f.hdrAuto=false; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
   }
 }
 function renderRules(){
@@ -494,6 +606,17 @@ function renderResult(){
     <button class="primary" data-dl="all" type="button">통합 결과 파일 내려받기</button>
     <button data-dl="A" type="button">${esc(A.label)} 표시본만</button>
     <button data-dl="B" type="button">${esc(B.label)} 표시본만</button>
+  </div>
+  <div class="mapdl">
+    <div><b>현장점검 지도로 보내기</b>
+      <div class="meta">이름·주소·팀·비고 4개 열로 된 파일을 만듭니다. 현장점검 지도의 계획에서 "엑셀 업로드"로 올리면 그대로 인식됩니다. 중복은 한 곳으로 합쳐 들어갑니다.</div></div>
+    <div class="row">
+      <label class="f">팀 칸에 넣을 값<select id="mapTeam">
+        <option value="none" ${state.mapTeam==='none'?'selected':''}>미배정 (엑셀에서 직접 채움)</option>
+        <option value="near" ${state.mapTeam==='near'?'selected':''}>인근 묶음 번호 (지도에서 묶음별 색)</option>
+      </select></label>
+      <button class="primary" data-dl="map" type="button">현장점검 지도용 파일 내려받기</button>
+    </div>
   </div>
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="${state.tab==='list'}" data-tab="list">중복대상</button>
@@ -544,6 +667,7 @@ function renderResult(){
   box.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; renderResult(); }));
   box.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{ state.filter=b.dataset.filter; renderResult(); }));
   box.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>download(b.dataset.dl)));
+  const mt = box.querySelector('#mapTeam'); if(mt) mt.addEventListener('change',e=>{ state.mapTeam = e.target.value; });
   const confirmPair = id => { const [a,b] = id.split('|').map(Number); state.alias.set(b,a); };
   box.querySelectorAll('[data-ok]').forEach(b=>b.addEventListener('click',()=>{ confirmPair(b.dataset.ok); compare(); renderResult(); toast('같은 대상으로 확정했습니다. 중복대상에 들어갑니다'); }));
   box.querySelectorAll('[data-no]').forEach(b=>b.addEventListener('click',()=>{ state.rejected.add(b.dataset.no); compare(); renderResult(); }));
@@ -662,6 +786,57 @@ function buildMarked(side){
 }
 
 /* 통합 결과 파일 */
+const srcName = t => t.src==='both' ? '양쪽(중복)' : state[t.src].label;
+function orderedTargets(){
+  const res = state.res, ordered = [];
+  res.near.forEach(g=>g.members.forEach(t=>ordered.push([g,t])));
+  const rest = res.targets.filter(t=>!t.near).sort((x,y)=>{
+    if(!x.pa && !y.pa) return 0; if(!x.pa) return 1; if(!y.pa) return -1;
+    return x.pa.road.localeCompare(y.pa.road,'ko') || x.pa.num - y.pa.num;
+  });
+  rest.forEach(t=>ordered.push([null,t]));
+  return ordered;
+}
+
+/* 현장점검 지도(field-check)용 파일
+   - 지도는 열 이름 키워드로 이름·주소·그룹/팀·추가정보를 찾음 → 열 이름을 이름/주소/팀/비고로 고정
+   - 지도는 빈 칸을 위 칸 값으로 채움(병합 셀 처리) → 모든 칸을 비우지 않음, 주소 없는 대상은 제외
+   - 지도의 엑셀 읽기는 기본 머리글 행이 2행 → 1행에 제목, 2행에 머리글을 둠 */
+function mapNameOf(t){
+  const r0 = state.rules[0];
+  if(t.rowsA.length) return String(t.rowsA[0].cells[r0.a] ?? '').trim();
+  return String(t.rowsB[0].cells[r0.b] ?? '').trim();
+}
+function buildFieldCheck(){
+  const {A,B} = state;
+  const now = new Date(), d2 = n => String(n).padStart(2,'0');
+  const title = `현장점검 지도용 · ${A.label} + ${B.label} · ${now.getFullYear()}-${d2(now.getMonth()+1)}-${d2(now.getDate())}`;
+  const rows = [[title,'','',''],['이름','주소','팀','비고']];
+  let skipped = 0, gi = -1, last = null;
+  const bands = [];
+  orderedTargets().forEach(([g,t])=>{
+    const name = mapNameOf(t) || t.name;
+    if(!t.addr || !name){ skipped++; return; }
+    const team = state.mapTeam==='near' ? (g ? g.id : '단독') : '미배정';
+    const where = [];
+    where.push(srcName(t));
+    if(g) where.push(`${g.id}(${g.where})`);
+    const refsTxt = [t.rowsA.length?`${A.label} ${t.rowsA.map(r=>r.excelRow).join(',')}행`:'', t.rowsB.length?`${B.label} ${t.rowsB.map(r=>r.excelRow).join(',')}행`:''].filter(Boolean).join(' / ');
+    where.push(refsTxt);
+    rows.push([name, t.addr, team, where.join(' · ')]);
+    if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['A1'].s = {font:{bold:true,sz:12}};
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:3}}];
+  styleRow(ws, 1, 4, HEAD_N);
+  bands.forEach((b,i)=>{ if(b>=0) styleRow(ws, i+2, 4, BAND[b]); });
+  ws['!cols'] = autoCols(rows.slice(1));
+  ws['!freeze'] = {xSplit:0,ySplit:2};
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '현장점검지도');
+  return {wb, count: rows.length-2, skipped};
+}
 function buildCombined(){
   const {A,B,res,rules} = state;
   const wb = XLSX.utils.book_new(), used = new Set();
@@ -714,15 +889,8 @@ function buildCombined(){
   });
 
   // 5. 배분용 전체대상: 중복은 하나로, 인근 묶음끼리 붙여 정렬
-  const srcName = t => t.src==='both' ? '양쪽(중복)' : state[t.src].label;
-  const ordered = [];
-  res.near.forEach(g=>g.members.forEach(t=>ordered.push([g,t])));
-  const rest = res.targets.filter(t=>!t.near).sort((x,y)=>{
-    if(!x.pa && !y.pa) return 0; if(!x.pa) return 1; if(!y.pa) return -1;
-    return x.pa.road.localeCompare(y.pa.road,'ko') || x.pa.num - y.pa.num;
-  });
-  rest.forEach(t=>ordered.push([null,t]));
-  const dist = [['인근묶음','묶음 위치','출처','대상물','주소',`${A.label} 행`,`${B.label} 행`,'배정 팀']];
+  const ordered = orderedTargets();
+  const dist = [['인근묶음','묶음 범위','출처','대상물','주소',`${A.label} 행`,`${B.label} 행`,'배정 팀']];
   ordered.forEach(([g,t])=>dist.push([g?g.id:'', g?g.where:'', srcName(t), t.name, t.addr, t.rowsA.map(r=>r.excelRow).join(', '), t.rowsB.map(r=>r.excelRow).join(', '), '']));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
   styleRow(wsX, 0, dist[0].length, HEAD_N);
@@ -738,7 +906,12 @@ function buildCombined(){
 async function download(which){
   let wb, name;
   try{
-    if(which==='all'){ wb = buildCombined(); name = `크로스체크_${state.A.label}_${state.B.label}.xlsx`.replace(/[\\\/:*?"<>|]/g,'_'); }
+    if(which==='map'){
+      const r = buildFieldCheck(); wb = r.wb;
+      name = `현장점검지도용_${state.A.label}_${state.B.label}.xlsx`.replace(/[\\\/:*?"<>|]/g,'_');
+      if(r.skipped) setTimeout(()=>toast(`주소가 없는 ${r.skipped}곳은 지도용 파일에서 뺐습니다`), 3000);
+    }
+    else if(which==='all'){ wb = buildCombined(); name = `크로스체크_${state.A.label}_${state.B.label}.xlsx`.replace(/[\\\/:*?"<>|]/g,'_'); }
     else { wb = buildMarked(which); name = state[which].name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'') + '_중복표시.xlsx'; }
   }catch(err){ console.error(err); toast('파일을 만들지 못했습니다.'); return; }
   const buf = XLSX.write(wb,{bookType:'xlsx',type:'array'});
