@@ -31,15 +31,22 @@
   --c0:#7cb2e0; --c1:#6cc49c; --c2:#b99be0; --c3:#e3a066; --c4:#6cc7cc; --c5:#ef8f9b; --c6:#bccb6a; --c7:#a9b3bf;
   color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
 .wrap{max-width:1180px;margin:0 auto;display:grid;gap:18px}
 header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 header p{margin:4px 0 0;color:var(--muted);max-width:72ch}
-.sample-note{display:inline-block;margin-top:8px;font-size:12px;padding:2px 8px;border-radius:4px;background:var(--dup-bg);color:var(--dup);border:1px solid var(--dup-line)}
+.sample-note{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:10px;font-size:13px;padding:8px 12px;border-radius:6px;background:var(--dup-bg);color:var(--fg);border:1px solid var(--dup-line)}
+.samplechip{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--dup-bg);color:var(--dup);border:1px solid var(--dup-line);white-space:nowrap}
+.start{display:grid;gap:14px;padding:8px 4px}
+.start ol{margin:0;padding-left:22px;display:grid;gap:6px;max-width:72ch}
+.start .row{align-items:center}
 .files{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .panel{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--fc,var(--line));border-radius:8px;padding:14px;display:grid;gap:10px;min-width:0;align-content:start}
 .panel.add{border-style:dashed;border-top-width:1px;background:transparent}
+.panel.add.only{grid-column:1/-1}
+.panel.add.only .drop{padding:36px 14px;font-size:15px}
 .tag{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 5px;font-family:var(--mono);font-size:15px;font-weight:700;line-height:1;border-radius:5px;background:var(--fc,var(--muted));color:var(--accent-ink);white-space:nowrap;vertical-align:middle}
 .tabs .tag,th .tag{min-width:20px;height:20px;font-size:13px;margin-right:5px}
 .refs span{font-weight:700}
@@ -131,7 +138,7 @@ td .meta{font-size:12px}
   <header>
     <h1>대상물 크로스 체크</h1>
     <p>여러 부서의 엑셀 대상물 목록을 맞대어, 대상물마다 어느 목록에 들어 있는지 찾아 표시합니다. 파일은 2개부터 8개까지 올릴 수 있고, 이 브라우저 안에서만 처리되어 어디에도 전송되지 않습니다.</p>
-    <span class="sample-note" id="sampleNote">지금은 예시 데이터입니다. 파일을 올리면 바뀝니다.</span>
+    <div class="sample-note" id="sampleNote" hidden><span>지금 보이는 것은 <b>예시 파일</b>입니다. 실제 파일을 올리면 예시는 자동으로 빠집니다.</span><button type="button" class="small" id="clearSample">예시 지우기</button></div>
   </header>
 
   <div class="files" id="files"></div>
@@ -600,7 +607,7 @@ function compare(){
 function renderFiles(){
   const box = $('#files');
   box.innerHTML = state.files.map((f,fi)=>`<div class="panel" style="${fc(f)}" data-fi="${fi}">
-      <div class="panel-head"><span class="tag">${letter(f)}</span><span class="fname" title="${esc(f.name)}">${esc(f.name)}</span>
+      <div class="panel-head"><span class="tag">${letter(f)}</span><span class="fname" title="${esc(f.name)}">${esc(f.name)}</span>${f.sample?'<span class="samplechip">예시</span>':''}
         <button type="button" class="ghost small" data-replace="${fi}">바꾸기</button>
         <button type="button" class="ghost small" data-remove="${fi}" aria-label="${esc(f.label)} 빼기">빼기</button></div>
       <div class="row">
@@ -609,7 +616,7 @@ function renderFiles(){
         <label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${f.id}" value="${f.headerRow}">${f.hdrAuto?`<span class="autochip" title="${esc(f.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost small" id="hdrAuto${f.id}">자동으로</button>`}</span></label>
       </div>
       <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.hdrTwo?' · 2줄 머리글':''}${f.mergeFilled?` · 병합 칸 ${f.mergeFilled}개 채움`:''}</span>
-    </div>`).join('') + (state.files.length<MAXF ? `<div class="panel add">
+    </div>`).join('') + (state.files.length<MAXF ? `<div class="panel add${state.files.length?'':' only'}">
       <div class="drop" tabindex="0" role="button" id="dropAdd">${state.files.length<2?'비교할 파일을':'파일을 더'} 끌어다 놓거나 <strong>눌러서 선택</strong><div class="meta">엑셀(.xlsx, .xls) 또는 CSV · 여러 개를 한 번에 올려도 됩니다 · 최대 ${MAXF}개</div></div>
     </div>` : '');
   const drop = $('#dropAdd');
@@ -652,7 +659,7 @@ function renderItems(){
 }
 function renderNear(){
   const box = $('#nearRow');
-  if(state.files.length<2){ box.innerHTML='<span class="meta">파일을 2개 이상 올리면 주소 열을 고를 수 있습니다.</span>'; return; }
+  if(state.files.length<2){ box.innerHTML='<span class="meta" style="grid-column:1/-1">파일을 2개 이상 올리면 주소 열을 고를 수 있습니다.</span>'; return; }
   const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'묶지 않음']];
   box.innerHTML = state.files.map((f,fi)=>`<label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 주소 열</span>${colSelect(f, f.addr, `data-fi="${fi}"`, true)}</label>`).join('')
     + `<label class="f"><span>묶음 범위</span><select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
@@ -670,7 +677,19 @@ function placesHtml(t){
 }
 function renderResult(){
   const box = $('#result'), res = state.res, files = state.files;
-  if(!res){ box.innerHTML = '<h2>결과</h2><div class="empty">파일을 2개 이상 올리면 결과가 여기에 나타납니다.</div>'; return; }
+  if(!res){
+    const n = files.length;
+    box.innerHTML = `<h2>결과</h2><div class="start">
+      <ol>
+        <li><b>파일 올리기</b> 위의 파일 칸에 부서별 엑셀을 2개 이상 올립니다. ${n===1?'<span class="samplechip">1개 더 필요</span>':''}</li>
+        <li><b>비교 기준 확인</b> 같은 대상인지 볼 열(대상물명, 명칭 등)이 자동으로 골라집니다. 다르면 바꿉니다.</li>
+        <li><b>결과 확인과 내려받기</b> 대상물마다 어느 목록에 있는지 대조표가 이 자리에 나타나고, 통합 결과 엑셀과 현장점검 지도용 파일을 내려받을 수 있습니다.</li>
+      </ol>
+      ${n===0?`<div class="row"><button type="button" data-sample>예시로 둘러보기</button><span class="meta">예방과·대응과·교육팀 가상 목록 3개로 결과 화면을 미리 봅니다.</span></div>`:''}
+    </div>`;
+    const sb = box.querySelector('[data-sample]'); if(sb) sb.addEventListener('click', loadSamples);
+    return;
+  }
   const N = files.length;
   let html = `<h2>결과</h2>
   <div class="summary">
@@ -803,8 +822,18 @@ function updateSampleNote(){
   const n = state.files.filter(f=>f.sample).length;
   const note = $('#sampleNote');
   note.hidden = n===0;
-  if(n && n<state.files.length) note.textContent = `예시 파일 ${n}개가 남아 있습니다. 필요 없으면 "빼기"를 누르세요.`;
 }
+function loadSamples(){
+  state.files = state.files.filter(f=>!f.sample);
+  SAMPLES.forEach(s=>{ if(state.files.length<MAXF) state.files.push(newFile(s.name, sampleWB(s.rows, s.sheet), s.label, true)); });
+  state.tab='matrix'; state.filter='dup';
+  updateSampleNote(); refreshAll();
+}
+$('#clearSample').addEventListener('click',()=>{
+  state.files.filter(f=>f.sample).forEach(f=>dropDecisions(f.id));
+  state.files = state.files.filter(f=>!f.sample);
+  state.tab='matrix'; updateSampleNote(); refreshAll(); toast('예시 파일을 지웠습니다');
+});
 async function handleFiles(list, replaceIdx){
   list = list.filter(f=>/\.(xlsx|xlsm|xls|csv)$/i.test(f.name));
   if(!list.length){ toast('엑셀(.xlsx/.xls) 또는 CSV 파일을 올려 주세요'); return; }
@@ -1071,7 +1100,6 @@ $('#addItem').addEventListener('click',()=>{ state.nItems++; refreshAll(); });
 $('#optFuzzy').addEventListener('change',e=>{ state.fuzzy=+e.target.value; compare(); renderResult(); });
 
 /* ---------- 시작: 예시 데이터 ---------- */
-SAMPLES.forEach(s=>state.files.push(newFile(s.name, sampleWB(s.rows, s.sheet), s.label, true)));
 refreshAll();
 })();
 </script>
