@@ -12,6 +12,7 @@
 :root{
   --bg:#f3f5f7; --surface:#ffffff; --line:#d9dee4; --fg:#1b232c; --muted:#5d6874;
   --accent:#1f5a8a; --accent-ink:#ffffff; --a-soft:#e3edf6; --ok:#2f7a5a; --ok-soft:#e2f1ea;
+  --drop-a:#e6f0fc; --drop-b:#e9f7ef; --drop-line:#9fc2e6; --drop-a-hover:#d6e7fb; --drop-b-hover:#dcf2e5;
   --dup:#b8730a; --dup-bg:#fff3d1; --dup-line:#efcf7a;
   --danger:#b3261e;
   --c0:#1f5a8a; --c1:#2f7a5a; --c2:#7a4fa0; --c3:#a35a16; --c4:#1d7f86; --c5:#b03a48; --c6:#6b7a1f; --c7:#5b6470;
@@ -23,12 +24,14 @@
   --accent:#6aa8dc; --accent-ink:#0d141b; --a-soft:#1d2d3c; --ok:#6cc49c; --ok-soft:#1a3029;
   --dup:#f0b54a; --dup-bg:#3a2e12; --dup-line:#6a5420; --danger:#ff8a80;
   --c0:#7cb2e0; --c1:#6cc49c; --c2:#b99be0; --c3:#e3a066; --c4:#6cc7cc; --c5:#ef8f9b; --c6:#bccb6a; --c7:#a9b3bf;
+  --drop-a:#1c2b3b; --drop-b:#1b2f29; --drop-line:#40607f; --drop-a-hover:#223548; --drop-b-hover:#213a32;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12171d; --surface:#1a2129; --line:#2c3540; --fg:#e4e9ee; --muted:#9aa5b1;
   --accent:#6aa8dc; --accent-ink:#0d141b; --a-soft:#1d2d3c; --ok:#6cc49c; --ok-soft:#1a3029;
   --dup:#f0b54a; --dup-bg:#3a2e12; --dup-line:#6a5420; --danger:#ff8a80;
   --c0:#7cb2e0; --c1:#6cc49c; --c2:#b99be0; --c3:#e3a066; --c4:#6cc7cc; --c5:#ef8f9b; --c6:#bccb6a; --c7:#a9b3bf;
+  --drop-a:#1c2b3b; --drop-b:#1b2f29; --drop-line:#40607f; --drop-a-hover:#223548; --drop-b-hover:#213a32;
   color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -53,8 +56,10 @@ header p{margin:4px 0 0;color:var(--muted);word-break:keep-all}
 .refs span{font-weight:700}
 .panel-head{display:flex;align-items:center;gap:8px;min-width:0}
 .panel-head .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
-.drop{border:1.5px dashed var(--line);border-radius:6px;padding:18px 14px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
-.drop:hover,.drop.over{border-color:var(--accent);background:var(--a-soft);color:var(--fg)}
+.drop{border:1.5px dashed var(--drop-line);border-radius:8px;padding:18px 14px;text-align:center;color:var(--fg);cursor:pointer;background:linear-gradient(135deg,var(--drop-a),var(--drop-b));transition:border-color .15s,background .15s}
+.drop .meta{color:var(--muted)}
+.drop,.samplerow{word-break:keep-all}
+.drop:hover,.drop.over{border-color:var(--accent);background:linear-gradient(135deg,var(--drop-a-hover),var(--drop-b-hover))}
 .drop strong{color:var(--accent)}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 label.f{display:grid;gap:3px;font-size:14px;color:var(--muted);min-width:0}
@@ -146,7 +151,7 @@ td .meta{font-size:14px}
 
   <section class="card">
     <h2>비교 기준</h2>
-    <p class="meta" style="margin:0">파일마다 같은 대상인지 판단할 열을 고릅니다. 열 이름이 파일마다 달라도 됩니다. 항목을 여러 개 두면 모든 항목이 같아야 같은 대상으로 봅니다.</p>
+    <p class="meta" style="margin:0">파일을 올리면 같은 대상인지 볼 열(대상물명·명칭 등)이 자동으로 골라집니다. 잘못 골라졌을 때만 바꾸면 됩니다.</p>
     <div class="items" id="items"></div>
     <div class="row"><button id="addItem" type="button">+ 비교 항목 추가</button></div>
     <div class="opts">
