@@ -47,6 +47,7 @@ header p{margin:4px 0 0;color:var(--muted);max-width:72ch}
 .panel.add{border-style:dashed;border-top-width:1px;background:transparent}
 .panel.add.only{grid-column:1/-1}
 .panel.add.only .drop{padding:36px 14px;font-size:15px}
+.samplerow{align-items:center;justify-content:center}
 .tag{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 5px;font-family:var(--mono);font-size:15px;font-weight:700;line-height:1;border-radius:5px;background:var(--fc,var(--muted));color:var(--accent-ink);white-space:nowrap;vertical-align:middle}
 .tabs .tag,th .tag{min-width:20px;height:20px;font-size:13px;margin-right:5px}
 .refs span{font-weight:700}
@@ -618,7 +619,9 @@ function renderFiles(){
       <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.hdrTwo?' · 2줄 머리글':''}${f.mergeFilled?` · 병합 칸 ${f.mergeFilled}개 채움`:''}</span>
     </div>`).join('') + (state.files.length<MAXF ? `<div class="panel add${state.files.length?'':' only'}">
       <div class="drop" tabindex="0" role="button" id="dropAdd">${state.files.length<2?'비교할 파일을':'파일을 더'} 끌어다 놓거나 <strong>눌러서 선택</strong><div class="meta">엑셀(.xlsx, .xls) 또는 CSV · 여러 개를 한 번에 올려도 됩니다 · 최대 ${MAXF}개</div></div>
+      ${state.files.length===0?`<div class="row samplerow"><button type="button" id="trySample">예시로 둘러보기</button><span class="meta">처음이라면 예방과·대응과·교육팀 가상 목록 3개로 결과 화면을 먼저 볼 수 있습니다.</span></div>`:''}
     </div>` : '');
+  const ts = $('#trySample'); if(ts) ts.addEventListener('click', loadSamples);
   const drop = $('#dropAdd');
   if(drop){
     drop.addEventListener('click',()=>pick(-1));
@@ -685,9 +688,7 @@ function renderResult(){
         <li><b>비교 기준 확인</b> 같은 대상인지 볼 열(대상물명, 명칭 등)이 자동으로 골라집니다. 다르면 바꿉니다.</li>
         <li><b>결과 확인과 내려받기</b> 대상물마다 어느 목록에 있는지 대조표가 이 자리에 나타나고, 통합 결과 엑셀과 현장점검 지도용 파일을 내려받을 수 있습니다.</li>
       </ol>
-      ${n===0?`<div class="row"><button type="button" data-sample>예시로 둘러보기</button><span class="meta">예방과·대응과·교육팀 가상 목록 3개로 결과 화면을 미리 봅니다.</span></div>`:''}
     </div>`;
-    const sb = box.querySelector('[data-sample]'); if(sb) sb.addEventListener('click', loadSamples);
     return;
   }
   const N = files.length;
