@@ -8,74 +8,78 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* Layout: 두 파일 패널을 나란히 두고, 가운데 비교 기준 줄로 잇는다. 아래는 결과 요약 → 탭형 표 → 내려받기 */
+/* Layout: 파일 카드들을 격자로 늘어놓고(파일마다 고유 색), 아래에 비교 항목 → 인근 묶음 → 결과(요약·대조표·내려받기) */
 :root{
   --bg:#f3f5f7; --surface:#ffffff; --line:#d9dee4; --fg:#1b232c; --muted:#5d6874;
-  --accent:#1f5a8a; --accent-ink:#ffffff;
-  --a:#1f5a8a; --a-soft:#e3edf6;
-  --b:#2f7a5a; --b-soft:#e2f1ea;
+  --accent:#1f5a8a; --accent-ink:#ffffff; --a-soft:#e3edf6; --ok:#2f7a5a; --ok-soft:#e2f1ea;
   --dup:#b8730a; --dup-bg:#fff3d1; --dup-line:#efcf7a;
   --danger:#b3261e;
+  --c0:#1f5a8a; --c1:#2f7a5a; --c2:#7a4fa0; --c3:#a35a16; --c4:#1d7f86; --c5:#b03a48; --c6:#6b7a1f; --c7:#5b6470;
   --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#12171d; --surface:#1a2129; --line:#2c3540; --fg:#e4e9ee; --muted:#9aa5b1;
-  --accent:#6aa8dc; --accent-ink:#0d141b;
-  --a:#7cb2e0; --a-soft:#1d2d3c; --b:#6cc49c; --b-soft:#1a3029;
-  --dup:#f0b54a; --dup-bg:#3a2e12; --dup-line:#6a5420; --danger:#ff8a80; color-scheme:dark}}
+  --accent:#6aa8dc; --accent-ink:#0d141b; --a-soft:#1d2d3c; --ok:#6cc49c; --ok-soft:#1a3029;
+  --dup:#f0b54a; --dup-bg:#3a2e12; --dup-line:#6a5420; --danger:#ff8a80;
+  --c0:#7cb2e0; --c1:#6cc49c; --c2:#b99be0; --c3:#e3a066; --c4:#6cc7cc; --c5:#ef8f9b; --c6:#bccb6a; --c7:#a9b3bf;
+  color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12171d; --surface:#1a2129; --line:#2c3540; --fg:#e4e9ee; --muted:#9aa5b1;
-  --accent:#6aa8dc; --accent-ink:#0d141b;
-  --a:#7cb2e0; --a-soft:#1d2d3c; --b:#6cc49c; --b-soft:#1a3029;
-  --dup:#f0b54a; --dup-bg:#3a2e12; --dup-line:#6a5420; --danger:#ff8a80; color-scheme:dark}
+  --accent:#6aa8dc; --accent-ink:#0d141b; --a-soft:#1d2d3c; --ok:#6cc49c; --ok-soft:#1a3029;
+  --dup:#f0b54a; --dup-bg:#3a2e12; --dup-line:#6a5420; --danger:#ff8a80;
+  --c0:#7cb2e0; --c1:#6cc49c; --c2:#b99be0; --c3:#e3a066; --c4:#6cc7cc; --c5:#ef8f9b; --c6:#bccb6a; --c7:#a9b3bf;
+  color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
 .wrap{max-width:1180px;margin:0 auto;display:grid;gap:18px}
 header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
-header p{margin:4px 0 0;color:var(--muted);max-width:68ch}
+header p{margin:4px 0 0;color:var(--muted);max-width:72ch}
 .sample-note{display:inline-block;margin-top:8px;font-size:12px;padding:2px 8px;border-radius:4px;background:var(--dup-bg);color:var(--dup);border:1px solid var(--dup-line)}
-.files{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:760px){.files{grid-template-columns:1fr}}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:10px;min-width:0}
-.panel[data-side="A"]{border-top:3px solid var(--a)}
-.panel[data-side="B"]{border-top:3px solid var(--b)}
-.tag{font-family:var(--mono);font-size:12px;font-weight:500;padding:1px 7px;border-radius:4px;color:#fff}
-.tag.A{background:var(--a);color:var(--accent-ink)}.tag.B{background:var(--b);color:var(--accent-ink)}
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--fc,var(--line));border-radius:8px;padding:14px;display:grid;gap:10px;min-width:0;align-content:start}
+.panel.add{border-style:dashed;border-top-width:1px;background:transparent}
+.tag{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 5px;font-family:var(--mono);font-size:15px;font-weight:700;line-height:1;border-radius:5px;background:var(--fc,var(--muted));color:var(--accent-ink);white-space:nowrap;vertical-align:middle}
+.tabs .tag,th .tag{min-width:20px;height:20px;font-size:13px;margin-right:5px}
+.refs span{font-weight:700}
 .panel-head{display:flex;align-items:center;gap:8px;min-width:0}
-.panel-head .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.drop{border:1.5px dashed var(--line);border-radius:6px;padding:14px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
+.panel-head .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:18px 14px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
 .drop:hover,.drop.over{border-color:var(--accent);background:var(--a-soft);color:var(--fg)}
 .drop strong{color:var(--accent)}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
-label.f{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+label.f{display:grid;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+label.f > span{display:flex;gap:6px;align-items:center;min-width:0}
 select,input[type=number],input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:5px 8px;min-width:0;max-width:100%}
 input[type=number]{width:72px}
-input[type=text]{width:150px}
+input[type=text]{width:140px}
 select:focus-visible,input:focus-visible,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .meta{font-size:12px;color:var(--muted)}
 section.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:12px;min-width:0}
 h2{margin:0;font-size:15px;font-weight:700}
-.rules{display:grid;gap:8px}
-.rule{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:center}
-.rule .eq{color:var(--muted);font-family:var(--mono)}
-.rule select{width:100%}
-@media (max-width:560px){.rule{grid-template-columns:auto minmax(0,1fr) auto}.rule .eq{display:none}.rule .tag.B{grid-column:1}}
+.items{display:grid;gap:10px}
+.item{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:8px;background:var(--bg)}
+.item-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px 12px}
+.fgrid select{width:100%}
 button{font:inherit;cursor:pointer;border-radius:5px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:6px 12px}
 button:hover{border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-button.primary:disabled{opacity:.45;cursor:not-allowed}
-button.ghost{border-color:transparent;color:var(--muted);padding:4px 8px}
+button.ghost{border-color:transparent;color:var(--muted);padding:4px 8px;background:transparent}
 button.ghost:hover{color:var(--danger);border-color:transparent}
+button.small{padding:3px 9px;font-size:12px}
 .opts{display:flex;flex-wrap:wrap;gap:6px 16px}
 .opts label{display:flex;gap:6px;align-items:center;font-size:13px}
 .summary{display:flex;flex-wrap:wrap;gap:10px}
-.stat{flex:1 1 150px;border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
-.stat .k{font-size:12px;color:var(--muted)}
+.stat{flex:1 1 140px;border:1px solid var(--line);border-top:3px solid var(--fc,var(--line));border-radius:6px;padding:10px 12px;background:var(--bg);min-width:0}
+.stat .k{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stat .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
 .stat.hot{border-color:var(--dup-line);background:var(--dup-bg)}
 .stat.hot .v{color:var(--dup)}
+.stat.near{border-color:var(--accent);background:var(--a-soft)}
+.stat.near .v{color:var(--accent)}
 .tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line)}
 .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--muted);background:none}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
@@ -83,25 +87,27 @@ button.ghost:hover{color:var(--danger);border-color:transparent}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chips button{padding:3px 10px;font-size:13px;border-radius:999px}
 .chips button[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
-.tbl{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:6px}
+.tbl{overflow:auto;max-height:540px;border:1px solid var(--line);border-radius:6px}
 table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
 th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
 th{position:sticky;top:0;background:var(--surface);font-weight:600;z-index:1}
+th.fcol{border-top:3px solid var(--fc)}
 td.num,th.num{font-family:var(--mono);color:var(--muted);text-align:right}
+td.mark{text-align:center}
 tr.dup td{background:var(--dup-bg)}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:0 8px;border-radius:999px;background:var(--dup);color:var(--surface)}
 .pill.no{background:transparent;color:var(--muted);font-weight:400;padding:0}
+.pill.man{background:var(--accent)}
+.pill.inner{background:transparent;color:var(--dup);border:1px solid var(--dup-line)}
 .refs{font-family:var(--mono);font-size:12px}
-.refs .A{color:var(--a)}.refs .B{color:var(--b)}
+.refs span{color:var(--fc)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--fc);vertical-align:middle;margin-right:4px}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 .dl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.stat.near{border-color:var(--a);background:var(--a-soft)}
-.stat.near .v{color:var(--a)}
 tr.grp1 td{background:var(--a-soft)}
 tr.grp2 td{background:var(--surface)}
 td[rowspan]{vertical-align:middle;border-right:1px solid var(--line)}
-.nearchip{font-size:12px;padding:0 7px;border-radius:4px;background:var(--a-soft);color:var(--a);font-weight:600}
-.pill.man{background:var(--a)}
+.nearchip{font-size:12px;padding:0 7px;border-radius:4px;background:var(--a-soft);color:var(--accent);font-weight:600}
 .hint{border:1px solid var(--dup-line);background:var(--dup-bg);border-radius:6px;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 .linkbtn{border:none;background:none;color:var(--accent);text-decoration:underline;padding:0}
 .count{font-size:11px;font-weight:700;background:var(--dup);color:var(--surface);border-radius:999px;padding:0 6px;margin-left:2px}
@@ -110,13 +116,12 @@ td .meta{font-size:12px}
 .mapdl{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;justify-content:space-between}
 .mapdl > div:first-child{flex:1 1 280px;min-width:0}
 .hdrbox{display:flex;gap:6px;align-items:center}
-.autochip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--b-soft);color:var(--b);cursor:help}
+.autochip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--ok-soft);color:var(--ok);cursor:help}
 .sheetplan{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
 .sheetplan ol{margin:4px 0 0;padding-left:20px;display:grid;gap:2px}
 .sheetplan b{margin-right:6px}
 .foot{font-size:12px;color:var(--muted);max-width:80ch}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px;z-index:10;max-width:calc(100% - 32px)}
-.err{color:var(--danger);font-size:13px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -125,21 +130,17 @@ td .meta{font-size:12px}
 <div class="wrap">
   <header>
     <h1>대상물 크로스 체크</h1>
-    <p>두 엑셀 파일에서 같은 대상물을 찾아 양쪽 파일에 모두 "중복"으로 표시합니다. 파일은 이 브라우저 안에서만 처리되고 어디에도 전송되지 않습니다.</p>
+    <p>여러 부서의 엑셀 대상물 목록을 맞대어, 대상물마다 어느 목록에 들어 있는지 찾아 표시합니다. 파일은 2개부터 8개까지 올릴 수 있고, 이 브라우저 안에서만 처리되어 어디에도 전송되지 않습니다.</p>
     <span class="sample-note" id="sampleNote">지금은 예시 데이터입니다. 파일을 올리면 바뀝니다.</span>
   </header>
 
-  <div class="files">
-    <div class="panel" data-side="A" id="panelA"></div>
-    <div class="panel" data-side="B" id="panelB"></div>
-  </div>
+  <div class="files" id="files"></div>
 
   <section class="card">
     <h2>비교 기준</h2>
-    <div class="rules" id="rules"></div>
-    <div class="row" style="justify-content:space-between">
-      <button id="addRule" type="button">+ 기준 열 추가 (모두 같아야 중복)</button>
-    </div>
+    <p class="meta" style="margin:0">파일마다 같은 대상인지 판단할 열을 고릅니다. 열 이름이 파일마다 달라도 됩니다. 항목을 여러 개 두면 모든 항목이 같아야 같은 대상으로 봅니다.</p>
+    <div class="items" id="items"></div>
+    <div class="row"><button id="addItem" type="button">+ 비교 항목 추가</button></div>
     <div class="opts">
       <label><input type="checkbox" id="optSpace" checked> 띄어쓰기 무시</label>
       <label><input type="checkbox" id="optCase" checked> 영문 대소문자 무시</label>
@@ -159,13 +160,13 @@ td .meta{font-size:12px}
   <section class="card">
     <h2>인근 주소 묶음 <span class="meta" style="font-weight:400">팀 배분용</span></h2>
     <p class="meta" style="margin:0;max-width:80ch">같은 도로에서 건물번호가 가까운 대상을 한 묶음으로 표시합니다. 도로명주소의 건물번호는 도로를 따라 약 10m마다 1씩 늘어나므로, 번호 차이로 거리를 어림할 수 있습니다. 지번주소는 같은 동·같은 본번일 때만 묶습니다.</p>
-    <div class="row" id="nearRow"></div>
+    <div class="fgrid" id="nearRow"></div>
   </section>
 
   <section class="card" id="result"></section>
 </div>
 <div class="toast" id="toast" hidden></div>
-<input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+<input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden>
 
 <script>/* xlsx-js-style 1.2.0 (Apache-2.0) */
 /* xlsx-js-style 1.2.0-beta @ 2022-04-05T01:40:40.843Z */
@@ -176,16 +177,23 @@ var XLSX={};function make_xlsx_lib(a){a.version="0.18.5",a.style_version="1.2.0"
 <script>
 (function(){
 const $ = s => document.querySelector(s);
+const MAXF = 8, LETTERS = 'ABCDEFGH';
+const XL_COLORS = ['1F5A8A','2F7A5A','7A4FA0','A35A16','1D7F86','B03A48','6B7A1F','5B6470'];
 const state = {
-  A:null, B:null,
-  rules:[],
-  near:{a:null,b:null,span:20},
-  fuzzy:0.85, alias:new Map(), rejected:new Set(), mapTeam:'none',
-  tab:'list', filter:'all',
-  res:null
+  files: [],          // 올린 파일들 (순서 = 화면 순서)
+  nItems: 1,          // 비교 항목 수 (파일마다 keys[i]로 열을 고름)
+  span: 20,           // 인근 묶음 범위(건물번호 차이), -1 = 묶지 않음
+  fuzzy: 0.85, aliases: [], rejected: new Set(), mapTeam: 'none',
+  tab: 'matrix', filter: 'dup', ffilter: 'all',
+  res: null
 };
+let fileSeq = 0;
 let dlPromise = null;
 try{ if(window.claude && window.claude.use) dlPromise = window.claude.use('downloads').catch(()=>null); }catch(e){}
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fc = f => `--fc:var(--c${f.color})`;
+const letter = f => LETTERS[f.color];
 
 /* ---------- 예시 데이터 ---------- */
 function sampleWB(rows, sheet){
@@ -193,26 +201,33 @@ function sampleWB(rows, sheet){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sheet);
   return wb;
 }
-const sampleA = [
-  ['연번','대상물명','소재지','용도','관리등급'],
-  [1,'시흥빌딩','금천구 시흥대로 123','근린생활시설','2급'],
-  [2,'가산 디지털타워','금천구 가산디지털1로 45','업무시설','1급'],
-  [3,'독산 행복요양원','금천구 독산로 210','노유자시설','2급'],
-  [4,'금천 물류센터','금천구 벚꽃로 88','창고시설','1급'],
-  [5,'한빛 어린이집','금천구 문성로 17','노유자시설','3급'],
-  [6,'은행나무 상가','금천구 독산로 54','판매시설','2급'],
-  [7,'가산 W센터','금천구 가산디지털2로 101','업무시설','1급'],
-  [8,'W센터 지하상가','금천구 가산디지털2로 101','판매시설','2급']
-];
-const sampleB = [
-  ['번호','명칭','주소','조사일','조사자'],
-  [1,'가산디지털타워','금천구 가산디지털1로 45','2026-09-02','김OO'],
-  [2,'시흥 빌딩','금천구 시흥대로123','2026-09-05','이OO'],
-  [3,'새벽 숙박','금천구 시흥대로 131','2026-09-08','박OO'],
-  [4,'한빛어린이집','금천구 문성로 17','2026-09-11','김OO'],
-  [5,'금천 의원','금천구 독산로 218','2026-09-15','최OO'],
-  [6,'가산 W센터','금천구 가산디지털2로 101','2026-09-20','이OO'],
-  [7,'금천 물류센타','금천구 벚꽃로 88','2026-09-25','박OO']
+const SAMPLES = [
+  {name:'예시_소방안전관리대상물.xlsx', label:'예방과', sheet:'대상물', rows:[
+    ['연번','대상물명','소재지','용도','관리등급'],
+    [1,'시흥빌딩','금천구 시흥대로 123','근린생활시설','2급'],
+    [2,'가산 디지털타워','금천구 가산디지털1로 45','업무시설','1급'],
+    [3,'독산 행복요양원','금천구 독산로 210','노유자시설','2급'],
+    [4,'금천 물류센터','금천구 벚꽃로 88','창고시설','1급'],
+    [5,'한빛 어린이집','금천구 문성로 17','노유자시설','3급'],
+    [6,'은행나무 상가','금천구 독산로 54','판매시설','2급'],
+    [7,'가산 W센터','금천구 가산디지털2로 101','업무시설','1급'],
+    [8,'W센터 지하상가','금천구 가산디지털2로 101','판매시설','2급']]},
+  {name:'예시_화재안전조사.xlsx', label:'대응과', sheet:'조사', rows:[
+    ['번호','명칭','주소','조사일','조사자'],
+    [1,'가산디지털타워','금천구 가산디지털1로 45','2026-09-02','김OO'],
+    [2,'시흥 빌딩','금천구 시흥대로123','2026-09-05','이OO'],
+    [3,'새벽 숙박','금천구 시흥대로 131','2026-09-08','박OO'],
+    [4,'한빛어린이집','금천구 문성로 17','2026-09-11','김OO'],
+    [5,'금천 의원','금천구 독산로 218','2026-09-15','최OO'],
+    [6,'가산 W센터','금천구 가산디지털2로 101','2026-09-20','이OO'],
+    [7,'금천 물류센타','금천구 벚꽃로 88','2026-09-25','박OO']]},
+  {name:'예시_소방교육대상.xlsx', label:'교육팀', sheet:'교육', rows:[
+    ['순번','업체명','소재지','교육 예정일'],
+    [1,'시흥빌딩','금천구 시흥대로 123','2026-11-03'],
+    [2,'한빛 어린이집','금천구 문성로 17','2026-11-05'],
+    [3,'독산행복요양원','금천구 독산로 210','2026-11-10'],
+    [4,'금천 의원','금천구 독산로 218','2026-11-12'],
+    [5,'가산 키즈카페','금천구 가산디지털1로 52','2026-11-17']]}
 ];
 
 /* ---------- 파일 읽기 ---------- */
@@ -226,6 +241,7 @@ async function readFile(file){
   }
   return XLSX.read(buf,{type:'array',cellDates:false});
 }
+
 /* ---------- 머리글 행 자동 인식 ----------
    위에서 15행 안의 각 행에 점수를 매겨 가장 머리글다운 행을 고른다.
    + 채워진 칸이 많을수록 (제목 행은 보통 한 칸뿐)
@@ -259,14 +275,13 @@ function detectHeader(aoa){
     const textShort = vals.filter((v,k)=>kinds[k]==='text' && v.length<=15).length;
     const kw = vals.filter(v=>{ const t=v.replace(/\s/g,'').toLowerCase(); return HEAD_WORDS.some(w=> w.length===1 ? t===w : t.includes(w)); }).length;
     const uniq = new Set(vals).size === n;
-    // 아래 5행: 같은 열에 값이 이어지는지, 생김새가 같은지
     let fill = 0, same = 0, cnt = 0;
     for(let j=i+1;j<Math.min(aoa.length,i+6);j++){
       const nr = (aoa[j]||[]).map(v=>String(v ?? '').trim());
       if(!nr.some(Boolean)) continue;
       cnt++;
       fill += cols.filter(c=>nr[c]).length / n;
-      same += cols.filter(c=>cellKind(nr[c])===kinds[cols.indexOf(c)] && kinds[cols.indexOf(c)]!=='text').length / n;
+      same += cols.filter((c,k)=>cellKind(nr[c])===kinds[k] && kinds[k]!=='text').length / n;
     }
     if(cnt){ fill/=cnt; same/=cnt; }
     const score = n/width*4 + textShort/n*3 + kw*1.5 + (uniq?1:0) + fill*3 - same*3 - (cnt?0:5);
@@ -274,12 +289,11 @@ function detectHeader(aoa){
   }
   return {idx:best.idx, why: best.kw ? `머리글 단어 ${best.kw}개` : `채워진 칸 ${best.n}개`};
 }
-/* 병합 셀 처리
+
+/* ---------- 병합 셀 ----------
    - 머리글 찾기는 병합을 풀기 전 모양으로 한다 (제목 병합이 여러 칸으로 번지면 머리글처럼 보이므로)
-   - 머리글: 병합 범위 전체에 값을 채운 뒤, 머리글 바로 아래 줄이 하위 머리글이면 두 줄을 합친다
-     (예: '소재지' 아래 '도로명/지번' → '소재지 도로명', '소재지 지번')
-   - 데이터: 세로로 병합된 칸만 아래로 채운다 (같은 건물의 여러 업소, 구분 열 등)
-     가로로만 병합된 데이터 칸은 채우지 않는다 (안내문 한 줄이 여러 열로 번지는 것 방지) */
+   - 머리글: 병합 범위 전체에 값을 채운 뒤, 바로 아래 줄이 하위 머리글이면 두 줄을 합친다 ('소재지'+'도로명')
+   - 데이터: 세로로 병합된 칸만 아래로 채운다 (같은 건물의 여러 업소, 구분 열 등) */
 function sheetMerges(ws, range){
   return (ws['!merges']||[]).map(m=>({r1:m.s.r-range.s.r, c1:m.s.c-range.s.c, r2:m.e.r-range.s.r, c2:m.e.c-range.s.c}));
 }
@@ -289,30 +303,27 @@ function mergedValue(aoa, merges, r, c){
   return String(v ?? '').trim();
 }
 function isSubHeader(aoa, merges, h){
-  const top = aoa[h]||[], sub = aoa[h+1];
+  const sub = aoa[h+1];
   if(!sub) return false;
-  // 머리글 행에서 시작하는 병합이 아래 줄까지 내려가거나(세로), 여러 열에 걸쳐 있고(가로) 그 아래에 값이 있으면 2줄 머리글
   const vert = merges.some(m=>m.r1===h && m.r2>h);
   const horiz = merges.filter(m=>m.r1===h && m.r2===h && m.c2>m.c1);
   const horizSub = horiz.some(m=>{ for(let c=m.c1;c<=m.c2;c++){ if(String(sub[c]??'').trim()) return true; } return false; });
   if(!vert && !horizSub) return false;
-  // 아래 줄 값이 머리글처럼 짧은 글자인지 확인 (숫자·날짜가 섞이면 데이터)
   const vals = sub.map(v=>String(v??'').trim()).filter(Boolean);
   return vals.length>0 && vals.every(v=>cellKind(v)==='text' && v.length<=15);
 }
-function loadSheet(side){
-  const f = state[side];
+function loadSheet(f){
   const ws = f.wb.Sheets[f.sheet];
   const aoa = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:true});
   const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : {s:{r:0,c:0}};
   const merges = sheetMerges(ws, range);
-  f.startRow = range.s.r;               // 시트의 첫 사용 행(0-based)
+  f.startRow = range.s.r;
   if(f.hdrAuto !== false){
     const d = detectHeader(aoa);
     f.headerRow = f.startRow + d.idx + 1;
     f.hdrAuto = true; f.hdrWhy = d.why;
   }
-  const h = Math.max(0, Math.max(1, f.headerRow) - 1 - f.startRow); // aoa 안에서 머리글 위치
+  const h = Math.max(0, Math.max(1, f.headerRow) - 1 - f.startRow);
   let width = 0;
   aoa.forEach(r => { if(r.length>width) width=r.length; });
   merges.forEach(m => { if(m.c2+1>width) width=m.c2+1; });
@@ -324,12 +335,11 @@ function loadSheet(side){
     const name = !sub || sub===top ? top : (!top ? sub : top+' '+sub);
     return name || XLSX.utils.encode_col(c + range.s.c)+'열';
   });
-  // 이름이 겹치는 머리글은 뒤에 번호를 붙여 구분
   const seen = {};
   f.headers = f.headers.map(n=>{ seen[n]=(seen[n]||0)+1; return seen[n]>1 ? `${n} (${seen[n]})` : n; });
   f.colOffset = range.s.c;
   const dataStart = h + (two?2:1);
-  const vmerges = merges.filter(m=>m.r2>m.r1 && m.r2>=dataStart);
+  const vmerges = merges.filter(m=>m.r2>m.r1 && m.r1>=dataStart);
   f.mergeFilled = 0;
   f.rows = [];
   for(let i=dataStart;i<aoa.length;i++){
@@ -337,7 +347,7 @@ function loadSheet(side){
     const cells = f.headers.map((_,c)=>{
       const v = r[c] ?? '';
       if(String(v).trim()!=='') return v;
-      const m = vmerges.find(m=>i>m.r1 && i<=m.r2 && c>=m.c1 && c<=m.c2 && m.r1>=dataStart);
+      const m = vmerges.find(m=>i>m.r1 && i<=m.r2 && c>=m.c1 && c<=m.c2);
       if(m){ f.mergeFilled++; return (aoa[m.r1]||[])[m.c1] ?? ''; }
       return v;
     });
@@ -345,54 +355,62 @@ function loadSheet(side){
     f.rows.push({excelRow: f.startRow + i + 1, cells});
   }
   if(two) f.hdrWhy = (f.hdrWhy ? f.hdrWhy+' · ' : '') + '2줄 머리글 합침';
+  f.keys = []; f.addr = null;   // 열 선택은 다시 추측
 }
-function guessRules(){
-  const A = state.A, B = state.B;
-  if(!A||!B) return;
-  const syn = [['대상물명','명칭','상호','건물명','대상물','이름','시설명'],['주소','소재지','도로명주소','지번주소','위치'],['관리번호','대상물번호','번호코드']];
-  const norm = s => s.replace(/\s/g,'');
-  for(const group of syn){
-    const a = A.headers.findIndex(h=>group.includes(norm(h)));
-    const b = B.headers.findIndex(h=>group.includes(norm(h)));
-    if(a>=0 && b>=0){ state.rules=[{a,b}]; return; }
-  }
-  for(const group of syn){
-    const has = h => group.some(w=>norm(h).includes(w));
-    const a = A.headers.findIndex(has), b = B.headers.findIndex(has);
-    if(a>=0 && b>=0){ state.rules=[{a,b}]; return; }
-  }
-  for(let a=0;a<A.headers.length;a++){
-    const b = B.headers.findIndex(h=>norm(h)===norm(A.headers[a]));
-    if(b>=0){ state.rules=[{a,b}]; return; }
-  }
-  state.rules=[{a:0,b:0}];
+
+/* ---------- 열 자동 선택 ---------- */
+const SYN = [
+  ['대상물명','명칭','상호','업체명','업소명','건물명','대상물','시설명','이름','대상'],
+  ['도로명주소','소재지','주소','지번주소','소재지주소','위치'],
+  ['관리번호','대상물번호','번호코드']
+];
+const norm = s => String(s).replace(/\s/g,'');
+function synGroupOf(h){
+  const n = norm(h);
+  let g = SYN.findIndex(gr=>gr.includes(n));
+  if(g<0) g = SYN.findIndex(gr=>gr.some(w=>n.includes(w)));
+  return g;
 }
-function guessAddr(side){
-  const f = state[side]; if(!f) return -1;
-  const prefer = ['도로명주소','소재지','주소','도로명','지번주소','위치','소재지주소'];
-  const hs = f.headers.map(h=>h.replace(/\s/g,''));
-  for(const p of prefer){ const i = hs.indexOf(p); if(i>=0) return i; }
-  const i = hs.findIndex(h=>/주소|소재지/.test(h));
+function findInGroup(f, g){
+  const hs = f.headers.map(norm);
+  for(const w of SYN[g]){ const i = hs.indexOf(w); if(i>=0) return i; }
+  for(const w of SYN[g]){ const i = hs.findIndex(h=>h.includes(w)); if(i>=0) return i; }
+  return -1;
+}
+function guessKey(f, item){
+  const ref = state.files.find(x=>x!==f && x.keys && x.keys[item]!=null);
+  if(ref){
+    const rh = ref.headers[ref.keys[item]];
+    const exact = f.headers.findIndex(h=>norm(h)===norm(rh));
+    if(exact>=0) return exact;
+    const g = synGroupOf(rh);
+    if(g>=0){ const i = findInGroup(f,g); if(i>=0) return i; }
+  }
+  if(item===0){ const i = findInGroup(f,0); if(i>=0) return i; }
+  return Math.min(item, f.headers.length-1);
+}
+function guessAddr(f){
+  const i = findInGroup(f,1);
   return i;
 }
-function clampNear(){
-  ['a','b'].forEach(k=>{
-    const side = k.toUpperCase(), f = state[side];
-    if(!f){ state.near[k]=null; return; }
-    if(state.near[k]===null || state.near[k] >= f.headers.length) state.near[k] = guessAddr(side);
+function ensureCols(){
+  state.files.forEach(f=>{
+    for(let i=0;i<state.nItems;i++){
+      if(f.keys[i]==null || f.keys[i]>=f.headers.length) f.keys[i] = guessKey(f,i);
+    }
+    f.keys.length = state.nItems;
+    if(f.addr==null || f.addr>=f.headers.length) f.addr = guessAddr(f);
   });
-}
-function clampRules(){
-  state.rules = state.rules.filter(r=> state.A && state.B && r.a < state.A.headers.length && r.b < state.B.headers.length);
-  if(!state.rules.length) guessRules();
 }
 
 /* ---------- 비교 ---------- */
+let OPT = {space:true, lower:true, punct:false};
+function readOpts(){ OPT = {space:$('#optSpace').checked, lower:$('#optCase').checked, punct:$('#optPunct').checked}; }
 function normalize(v){
   let s = String(v ?? '').trim();
-  if($('#optSpace').checked) s = s.replace(/\s+/g,'');
-  if($('#optCase').checked) s = s.toLowerCase();
-  if($('#optPunct').checked) s = s.replace(/[-–—_.,·・()\[\]{}'"`~!@#$%^&*+=|\\/:;<>?]/g,'');
+  if(OPT.space) s = s.replace(/\s+/g,'');
+  if(OPT.lower) s = s.toLowerCase();
+  if(OPT.punct) s = s.replace(/[-–—_.,·・()\[\]{}'"`~!@#$%^&*+=|\\/:;<>?]/g,'');
   return s;
 }
 function keyOf(cells, idxs){
@@ -400,7 +418,6 @@ function keyOf(cells, idxs){
   if(parts.every(p=>p==='')) return null;
   return parts.join('\u0001');
 }
-function addrOf(side,row){ const k = side.toLowerCase(), i = state.near[k]; return (i===null||i<0) ? '' : String(row.cells[i] ?? '').trim(); }
 function parseAddr(s){
   if(!s) return null;
   let m = s.match(/([가-힣0-9]+(?:로|길))\s*(\d+)/);
@@ -410,16 +427,14 @@ function parseAddr(s){
   return null;
 }
 function groupNear(targets){
-  const span = state.near.span;
-  targets.forEach(t=>{ t.pa = parseAddr(t.addr); t.near=null; t.rowsA.forEach(r=>r.near=null); t.rowsB.forEach(r=>r.near=null); });
-  state.A.rows.forEach(r=>r.near=null); state.B.rows.forEach(r=>r.near=null);
-  if(span < 0) return [];
+  targets.forEach(t=>{ t.pa = parseAddr(t.addr); t.near=null; t.rows.forEach(r=>r.near=null); });
+  if(state.span < 0) return [];
   const byKey = new Map();
   targets.forEach(t=>{ if(!t.pa) return; const k=t.pa.kind+'|'+t.pa.road; if(!byKey.has(k)) byKey.set(k,[]); byKey.get(k).push(t); });
   const out = [];
   [...byKey.keys()].sort((x,y)=>x.localeCompare(y,'ko')).forEach(k=>{
     const list = byKey.get(k).sort((x,y)=>x.pa.num-y.pa.num);
-    const lim = list[0].pa.kind==='J' ? 0 : span;
+    const lim = list[0].pa.kind==='J' ? 0 : state.span;
     let cur = [];
     const flush = () => { if(cur.length>=2) out.push(cur); cur=[]; };
     list.forEach(t=>{ if(cur.length && t.pa.num - cur[0].pa.num > lim) flush(); cur.push(t); });
@@ -429,10 +444,11 @@ function groupNear(targets){
     const id = '묶음 ' + String(i+1).padStart(2,'0');
     const from = members[0].pa.num, to = members[members.length-1].pa.num;
     const where = members[0].pa.road + ' ' + (from===to ? from : `${from}~${to}`);
-    members.forEach(t=>{ t.near=id; t.rowsA.forEach(r=>r.near=id); t.rowsB.forEach(r=>r.near=id); });
+    members.forEach(t=>{ t.near=id; t.rows.forEach(r=>r.near=id); });
     return {id, where, members};
   });
 }
+/* 오타 후보: 한글을 자음·모음 단위로 쪼개 편집 거리로 유사도 계산 */
 function fuzzNorm(s){ return String(s ?? '').toLowerCase().replace(/[\s\-–—_.,·・()\[\]{}'"`~!@#$%^&*+=|\\/:;<>?]/g,''); }
 function jamo(s){
   const out = [];
@@ -453,159 +469,234 @@ function lev(a,b){
   }
   return prev[b.length];
 }
-function findCands(ai,bi){
+/* 후보 찾기 속도: 자모 2글자 조각(bigram)을 색인해 공유 조각 수가 모자라는 쌍은 거리 계산 없이 버린다.
+   편집 거리 k 이내인 두 문자열은 최소 (긴 길이 - 1 - 2k)개의 bigram을 공유한다.
+   이름 속 숫자가 서로 다르면(101동/102동, 제1공장/제2공장) 다른 대상으로 보고 후보에서 뺀다. */
+function prepFuzzy(r, f){
+  const s = fuzzNorm(f.keys.map(i=>r.cells[i]).join(''));
+  const j = jamo(s);
+  const grams = new Set();
+  for(let i=0;i+1<j.length;i++) grams.add(j[i]*400000 + j[i+1]);
+  return {r, j, grams:[...grams], digits:(s.match(/\d+/g)||[]).join(',')};
+}
+function addrKey(pa){ return pa ? pa.kind+'|'+pa.road+'|'+pa.num : null; }
+function findCands(){
   const thr = state.fuzzy; if(thr<0) return [];
-  const As = state.A.rows.filter(r=>!r.other && r.key!==null), Bs = state.B.rows.filter(r=>!r.other && r.key!==null);
-  if(!As.length || !Bs.length) return [];
-  const prep = (r,idx)=>{ const s=fuzzNorm(idx.map(i=>r.cells[i]).join('')); return {r, j:jamo(s), chars:[...new Set(s)]}; };
-  const PA = As.map(r=>prep(r,ai)), PB = Bs.map(r=>prep(r,bi));
-  const index = new Map();
-  PB.forEach((p,i)=>p.chars.forEach(ch=>{ if(!index.has(ch)) index.set(ch,[]); index.get(ch).push(i); }));
-  const cnt = new Int32Array(PB.length), out = [];
-  PA.forEach(pa=>{
-    if(!pa.j.length) return;
-    const touched = [];
-    pa.chars.forEach(ch=>{ const l=index.get(ch); if(l) l.forEach(i=>{ if(cnt[i]++===0) touched.push(i); }); });
-    const found = [];
-    touched.forEach(i=>{
-      const c = cnt[i]; cnt[i] = 0; const pb = PB[i];
-      if(!pb.j.length || c < Math.max(1, Math.floor(Math.min(pa.chars.length,pb.chars.length)*0.5))) return;
-      const sim = 1 - lev(pa.j,pb.j)/Math.max(pa.j.length,pb.j.length);
-      const x = pa.r.pa, y = pb.r.pa;
-      const addrSame = !!(x && y && x.kind===y.kind && x.road===y.road && x.num===y.num);
-      if(sim>=thr || (addrSame && sim>=0.5)){
-        const id = pa.r.excelRow+'|'+pb.r.excelRow;
-        if(!state.rejected.has(id)) found.push({id, a:pa.r, b:pb.r, sim, addrSame});
-      }
+  const files = state.files, out = [];
+  for(let a=0;a<files.length;a++) for(let b=a+1;b<files.length;b++){
+    // 이미 서로의 파일과 연결된 대상은 빼고, 아직 짝이 없는 행끼리만 비교
+    const PA = files[a].rows.filter(r=>r.key!==null && !r.target.byFile[b].length).map(r=>prepFuzzy(r,files[a]));
+    const PB = files[b].rows.filter(r=>r.key!==null && !r.target.byFile[a].length).map(r=>prepFuzzy(r,files[b]));
+    if(!PA.length || !PB.length) continue;
+    const index = new Map(), byAddr = new Map();
+    PB.forEach((p,i)=>{
+      p.grams.forEach(g=>{ let l=index.get(g); if(!l) index.set(g, l=[]); l.push(i); });
+      const ak = addrKey(p.r.pa); if(ak){ let l=byAddr.get(ak); if(!l) byAddr.set(ak, l=[]); l.push(i); }
     });
-    found.sort((x,y)=>y.sim-x.sim);
-    out.push(...found.slice(0,3));
-  });
+    const cnt = new Int32Array(PB.length);
+    PA.forEach(pa=>{
+      if(!pa.j.length) return;
+      const seen = new Map();
+      const consider = (i, addrSame) => {
+        if(seen.has(i)) return; seen.set(i, 1);
+        const pb = PB[i];
+        if(!pb.j.length || pa.digits !== pb.digits) return;
+        const L = Math.max(pa.j.length, pb.j.length);
+        const sim = 1 - lev(pa.j,pb.j)/L;
+        if(sim>=thr || (addrSame && sim>=0.5)){
+          const id = pa.r.rid+'|'+pb.r.rid;
+          if(!state.rejected.has(id)) found.push({id, a:pa.r, b:pb.r, sim, addrSame});
+        }
+      };
+      const found = [];
+      // 1) 주소가 같은 행은 이름이 꽤 달라도(50% 이상) 비교
+      const ak = addrKey(pa.r.pa);
+      if(ak) (byAddr.get(ak)||[]).forEach(i=>consider(i, true));
+      // 2) 나머지는 공유 조각 수로 거른 뒤 비교
+      const touched = [];
+      pa.grams.forEach(g=>{ const l=index.get(g); if(l) for(const i of l){ if(cnt[i]++===0) touched.push(i); } });
+      const la = pa.j.length;
+      for(const i of touched){
+        const c = cnt[i]; cnt[i] = 0;
+        const lb = PB[i].j.length, L = Math.max(la,lb);
+        const k = Math.floor((1-thr)*L + 1e-9);
+        if(Math.abs(la-lb) > k) continue;
+        if(c < L - 1 - 2*k) continue;
+        consider(i, false);
+      }
+      found.sort((x,y)=>y.sim-x.sim);
+      out.push(...found.slice(0,3));
+    });
+  }
   out.sort((x,y)=>(y.addrSame-x.addrSame)||(y.sim-x.sim));
   out.forEach(c=>{
     const pct = Math.round(c.sim*100);
-    c.a.candTxt += (c.a.candTxt?', ':'') + `${state.B.label} ${c.b.excelRow}행(${pct}%)`;
-    c.b.candTxt += (c.b.candTxt?', ':'') + `${state.A.label} ${c.a.excelRow}행(${pct}%)`;
+    const fa = state.files[c.a.fi], fb = state.files[c.b.fi];
+    c.a.candTxt += (c.a.candTxt?', ':'') + `${fb.label} ${c.b.excelRow}행(${pct}%)`;
+    c.b.candTxt += (c.b.candTxt?', ':'') + `${fa.label} ${c.a.excelRow}행(${pct}%)`;
   });
   return out;
 }
-function resetDecisions(){ state.alias.clear(); state.rejected.clear(); }
+function dropDecisions(fileId){
+  const has = rid => rid.split(':')[0]===String(fileId);
+  state.aliases = state.aliases.filter(([x,y])=>!has(x) && !has(y));
+  state.rejected = new Set([...state.rejected].filter(id=>{ const [x,y]=id.split('|'); return !has(x) && !has(y); }));
+}
+/* 같은 대상 연결: 기준값이 같은 행끼리, 그리고 사람이 확정한 쌍끼리 모두 이어서 한 대상으로 묶는다.
+   A=B, B=C 이면 A·B·C가 한 대상 (union-find) */
 function compare(){
-  const {A,B,rules} = state;
-  if(!A||!B||!rules.length){ state.res=null; return; }
-  const ai = rules.map(r=>r.a), bi = rules.map(r=>r.b);
-  const mapB = new Map(), mapA = new Map();
-  const aKeyByRow = new Map();
-  A.rows.forEach(r=>{ const k=keyOf(r.cells,ai); r.key=k; r.pa=parseAddr(addrOf('A',r)); r.candTxt=''; if(k===null) return; aKeyByRow.set(r.excelRow,k); if(!mapA.has(k)) mapA.set(k,[]); mapA.get(k).push(r.excelRow); });
-  B.rows.forEach(r=>{
-    let k = keyOf(r.cells,bi); r.manual=false; r.pa=parseAddr(addrOf('B',r)); r.candTxt='';
-    const al = state.alias.get(r.excelRow);
-    if(al!==undefined && aKeyByRow.has(al)){ k = aKeyByRow.get(al); r.manual = true; }
-    r.key=k; if(k===null) return; if(!mapB.has(k)) mapB.set(k,[]); mapB.get(k).push(r.excelRow);
-  });
-  A.rows.forEach(r=>{ r.other = r.key!==null && mapB.has(r.key) ? mapB.get(r.key) : null; });
-  B.rows.forEach(r=>{ r.other = r.key!==null && mapA.has(r.key) ? mapA.get(r.key) : null; });
-  const groups = [];
-  for(const [k,aRows] of mapA){
-    if(!mapB.has(k)) continue;
-    const aObjs = A.rows.filter(r=>r.key===k);
-    const bObjs = B.rows.filter(r=>r.key===k);
-    groups.push({label: ai.map(i=>aObjs[0].cells[i]).join(' / '), labelB: bi.map(i=>bObjs[0].cells[i]).join(' / '), aRows, bRows: mapB.get(k), aObjs, bObjs, manual: bObjs.some(r=>r.manual)});
-  }
-  groups.sort((x,y)=>x.aRows[0]-y.aRows[0]);
-  const dupA = A.rows.filter(r=>r.other).length, dupB = B.rows.filter(r=>r.other).length;
-  // 대상물 단위 목록(중복은 하나로 합침)
-  const targets = [];
-  groups.forEach(g=>targets.push({src:'both', name:g.label, addr: addrOf('A',g.aObjs[0]) || addrOf('B',g.bObjs[0]), rowsA:g.aObjs, rowsB:g.bObjs}));
-  A.rows.filter(r=>!r.other).forEach(r=>targets.push({src:'A', name:ai.map(i=>r.cells[i]).join(' / '), addr:addrOf('A',r), rowsA:[r], rowsB:[]}));
-  B.rows.filter(r=>!r.other).forEach(r=>targets.push({src:'B', name:bi.map(i=>r.cells[i]).join(' / '), addr:addrOf('B',r), rowsA:[], rowsB:[r]}));
+  const files = state.files;
+  if(files.length<2){ state.res=null; return; }
+  ensureCols(); readOpts();
+  const parent = new Map();
+  const find = x => { while(parent.get(x)!==x){ parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  const union = (x,y) => { const a=find(x), b=find(y); if(a!==b) parent.set(a,b); };
+  const all = [];
+  files.forEach((f,fi)=>f.rows.forEach(r=>{
+    r.fi = fi; r.rid = f.id+':'+r.excelRow;
+    r.key = keyOf(r.cells, f.keys);
+    r.addrTxt = f.addr>=0 ? String(r.cells[f.addr] ?? '').trim() : '';
+    r.pa = parseAddr(r.addrTxt); r.candTxt = '';
+    parent.set(r.rid, r.rid); all.push(r);
+  }));
+  const firstByKey = new Map();
+  all.forEach(r=>{ if(r.key===null) return; if(firstByKey.has(r.key)) union(r.rid, firstByKey.get(r.key)); else firstByKey.set(r.key, r.rid); });
+  const manual = new Set();
+  state.aliases.forEach(([x,y])=>{ if(parent.has(x) && parent.has(y)){ union(x,y); manual.add(x); manual.add(y); } });
+  const comp = new Map();
+  all.forEach(r=>{ const k=find(r.rid); if(!comp.has(k)) comp.set(k,[]); comp.get(k).push(r); });
+  const targets = [...comp.values()].map(rows=>{
+    const byFile = files.map(()=>[]);
+    rows.forEach(r=>byFile[r.fi].push(r));
+    const inFiles = byFile.map((a,i)=>a.length?i:-1).filter(i=>i>=0);
+    const first = byFile[inFiles[0]][0], ff = files[first.fi];
+    const t = {rows, byFile, inFiles, n: inFiles.length,
+      inner: byFile.some(a=>a.length>1),
+      manual: rows.some(r=>manual.has(r.rid)),
+      name: ff.keys.map(i=>first.cells[i]).join(' / '),
+      name1: String(first.cells[ff.keys[0]] ?? '').trim(),
+      addr: (rows.find(r=>r.addrTxt)||{}).addrTxt || '',
+      order: first.fi*1e7 + first.excelRow};
+    rows.forEach(r=>r.target=t);
+    return t;
+  }).sort((x,y)=>x.order-y.order);
   const near = groupNear(targets);
-  const cands = findCands(ai,bi);
-  state.res = {
-    cands,
-    groups, dupA, dupB, targets, near,
-    onlyA: A.rows.length - dupA,
-    onlyB: B.rows.length - dupB,
-    unparsed: targets.filter(t=>t.addr && !t.pa).length
-  };
+  const cands = findCands();
+  const perFile = files.map((f,fi)=>({
+    dup: f.rows.filter(r=>r.target.n>1).length,
+    only: f.rows.filter(r=>r.target.n===1).length,
+    onlyT: targets.filter(t=>t.n===1 && t.inFiles[0]===fi).length,
+    inner: f.rows.filter(r=>r.target.byFile[fi].length>1).length
+  }));
+  state.res = {targets, near, cands, perFile,
+    multi: targets.filter(t=>t.n>1).length,
+    every: targets.filter(t=>t.n===files.length).length,
+    innerT: targets.filter(t=>t.inner).length,
+    manualT: targets.filter(t=>t.manual && t.n>1).length,
+    unparsed: targets.filter(t=>t.addr && !t.pa).length};
 }
 
-/* ---------- 화면 ---------- */
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-function renderPanel(side){
-  const p = $('#panel'+side), f = state[side];
-  const other = side==='A'?'B':'A';
-  let html = `<div class="panel-head"><span class="tag ${side}">파일 ${side}</span><span class="fname">${f?esc(f.name):'파일을 올려 주세요'}</span></div>
-    <div class="drop" tabindex="0" role="button" data-side="${side}">엑셀(.xlsx, .xls) 또는 CSV 파일을 끌어다 놓거나 <strong>눌러서 선택</strong></div>`;
-  if(f){
-    html += `<div class="row">
-      <label class="f">부서/구분 이름<input type="text" id="lbl${side}" maxlength="20" value="${esc(f.label)}"></label>
-      <label class="f">시트<select id="sheet${side}">${f.wb.SheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
-      <label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${side}" value="${f.headerRow}">${f.hdrAuto?`<span class="autochip" title="${esc(f.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost" id="hdrAuto${side}">자동으로</button>`}</span></label>
+/* ---------- 화면: 파일 ---------- */
+function renderFiles(){
+  const box = $('#files');
+  box.innerHTML = state.files.map((f,fi)=>`<div class="panel" style="${fc(f)}" data-fi="${fi}">
+      <div class="panel-head"><span class="tag">${letter(f)}</span><span class="fname" title="${esc(f.name)}">${esc(f.name)}</span>
+        <button type="button" class="ghost small" data-replace="${fi}">바꾸기</button>
+        <button type="button" class="ghost small" data-remove="${fi}" aria-label="${esc(f.label)} 빼기">빼기</button></div>
+      <div class="row">
+        <label class="f">부서/구분 이름<input type="text" id="lbl${f.id}" maxlength="20" value="${esc(f.label)}"></label>
+        <label class="f">시트<select id="sheet${f.id}">${f.wb.SheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
+        <label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${f.id}" value="${f.headerRow}">${f.hdrAuto?`<span class="autochip" title="${esc(f.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost small" id="hdrAuto${f.id}">자동으로</button>`}</span></label>
+      </div>
       <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.hdrTwo?' · 2줄 머리글':''}${f.mergeFilled?` · 병합 칸 ${f.mergeFilled}개 채움`:''}</span>
-    </div>`;
+    </div>`).join('') + (state.files.length<MAXF ? `<div class="panel add">
+      <div class="drop" tabindex="0" role="button" id="dropAdd">${state.files.length<2?'비교할 파일을':'파일을 더'} 끌어다 놓거나 <strong>눌러서 선택</strong><div class="meta">엑셀(.xlsx, .xls) 또는 CSV · 여러 개를 한 번에 올려도 됩니다 · 최대 ${MAXF}개</div></div>
+    </div>` : '');
+  const drop = $('#dropAdd');
+  if(drop){
+    drop.addEventListener('click',()=>pick(-1));
+    drop.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(-1);} });
+    drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+    drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+    drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over'); handleFiles([...e.dataTransfer.files], -1);});
   }
-  p.innerHTML = html;
-  const drop = p.querySelector('.drop');
-  drop.addEventListener('click',()=>pick(side));
-  drop.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(side);} });
-  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
-  drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
-  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over'); if(e.dataTransfer.files[0]) handleFile(side,e.dataTransfer.files[0]);});
-  if(f){
-    p.querySelector('#lbl'+side).addEventListener('change',e=>{ f.label = e.target.value.trim() || ('파일 '+side); e.target.value=f.label; renderResult(); });
-    p.querySelector('#sheet'+side).addEventListener('change',e=>{ resetDecisions(); f.sheet=e.target.value; f.hdrAuto=true; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
-    const ab = p.querySelector('#hdrAuto'+side);
-    if(ab) ab.addEventListener('click',()=>{ resetDecisions(); f.hdrAuto=true; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
-    p.querySelector('#hdr'+side).addEventListener('change',e=>{ resetDecisions(); f.headerRow=Math.max(1,parseInt(e.target.value)||1); f.hdrAuto=false; state.near[side.toLowerCase()]=null; loadSheet(side); clampRules(); refreshAll(); });
-  }
+  box.querySelectorAll('[data-replace]').forEach(b=>b.addEventListener('click',()=>pick(+b.dataset.replace)));
+  box.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{
+    const f = state.files[+b.dataset.remove];
+    dropDecisions(f.id); state.files.splice(+b.dataset.remove,1);
+    if(state.tab==='f'+f.id) state.tab='matrix';
+    updateSampleNote(); refreshAll(); toast(`${f.label} 파일을 뺐습니다`);
+  }));
+  state.files.forEach(f=>{
+    $('#lbl'+f.id).addEventListener('change',e=>{ f.label = e.target.value.trim() || ('파일 '+letter(f)); e.target.value=f.label; renderItems(); renderNear(); compare(); renderResult(); });
+    const reload = () => { dropDecisions(f.id); loadSheet(f); refreshAll(); };
+    $('#sheet'+f.id).addEventListener('change',e=>{ f.sheet=e.target.value; f.hdrAuto=true; reload(); });
+    $('#hdr'+f.id).addEventListener('change',e=>{ f.headerRow=Math.max(1,parseInt(e.target.value)||1); f.hdrAuto=false; reload(); });
+    const ab = $('#hdrAuto'+f.id); if(ab) ab.addEventListener('click',()=>{ f.hdrAuto=true; reload(); });
+  });
 }
-function renderRules(){
-  const box = $('#rules');
-  if(!state.A||!state.B){ box.innerHTML='<div class="meta">두 파일을 모두 올리면 비교할 열을 고를 수 있습니다.</div>'; $('#addRule').disabled=true; return; }
-  $('#addRule').disabled=false;
-  box.innerHTML = state.rules.map((r,i)=>`<div class="rule">
-    <span class="tag A">A</span>
-    <select data-i="${i}" data-k="a" aria-label="파일 A 기준 열">${state.A.headers.map((h,j)=>`<option value="${j}" ${j===r.a?'selected':''}>${esc(h)}</option>`).join('')}</select>
-    <span class="eq">=</span>
-    <span class="tag B">B</span>
-    <select data-i="${i}" data-k="b" aria-label="파일 B 기준 열">${state.B.headers.map((h,j)=>`<option value="${j}" ${j===r.b?'selected':''}>${esc(h)}</option>`).join('')}</select>
-    ${state.rules.length>1?`<button class="ghost" data-del="${i}" type="button" aria-label="기준 삭제">삭제</button>`:'<span></span>'}
-  </div>`).join('');
-  box.querySelectorAll('select').forEach(s=>s.addEventListener('change',e=>{ state.rules[+e.target.dataset.i][e.target.dataset.k]=+e.target.value; compare(); renderResult(); }));
-  box.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{ state.rules.splice(+b.dataset.del,1); refreshAll(); }));
+function colSelect(f, val, attrs, withNone){
+  return `<select ${attrs}>${withNone?`<option value="-1" ${val===-1?'selected':''}>사용 안 함</option>`:''}${f.headers.map((h,j)=>`<option value="${j}" ${j===val?'selected':''}>${esc(h)}</option>`).join('')}</select>`;
 }
-function refs(rows, side){ return rows.map(n=>`<span class="${side}">${side}${n}</span>`).join(', '); }
+function renderItems(){
+  const box = $('#items');
+  if(state.files.length<2){ box.innerHTML='<div class="meta">파일을 2개 이상 올리면 비교할 열을 고를 수 있습니다.</div>'; $('#addItem').disabled=true; return; }
+  ensureCols();
+  $('#addItem').disabled = false;
+  box.innerHTML = Array.from({length:state.nItems},(_,i)=>`<div class="item">
+      <div class="item-head"><span>비교 항목 ${i+1}</span>${state.nItems>1?`<button type="button" class="ghost small" data-delitem="${i}">항목 삭제</button>`:''}</div>
+      <div class="fgrid">${state.files.map((f,fi)=>`<label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)}</span>${colSelect(f, f.keys[i], `data-fi="${fi}" data-item="${i}" aria-label="${esc(f.label)} 비교 항목 ${i+1}"`)}</label>`).join('')}</div>
+    </div>`).join('');
+  box.querySelectorAll('select').forEach(s=>s.addEventListener('change',e=>{ state.files[+s.dataset.fi].keys[+s.dataset.item] = +e.target.value; compare(); renderResult(); }));
+  box.querySelectorAll('[data-delitem]').forEach(b=>b.addEventListener('click',()=>{ const i=+b.dataset.delitem; state.files.forEach(f=>f.keys.splice(i,1)); state.nItems--; refreshAll(); }));
+}
+function renderNear(){
+  const box = $('#nearRow');
+  if(state.files.length<2){ box.innerHTML='<span class="meta">파일을 2개 이상 올리면 주소 열을 고를 수 있습니다.</span>'; return; }
+  const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'묶지 않음']];
+  box.innerHTML = state.files.map((f,fi)=>`<label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 주소 열</span>${colSelect(f, f.addr, `data-fi="${fi}"`, true)}</label>`).join('')
+    + `<label class="f"><span>묶음 범위</span><select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
+  box.querySelectorAll('select[data-fi]').forEach(s=>s.addEventListener('change',e=>{ state.files[+s.dataset.fi].addr = +e.target.value; compare(); renderResult(); }));
+  $('#nearSpan').addEventListener('change',e=>{ state.span=+e.target.value; compare(); renderResult(); });
+}
 
+/* ---------- 화면: 결과 ---------- */
+function refList(rows){ return rows.map(r=>r.excelRow).join(','); }
+function refsHtml(t, skipFi){
+  return t.inFiles.filter(fi=>fi!==skipFi).map(fi=>{ const f=state.files[fi]; return `<span style="${fc(f)}">${letter(f)}${refList(t.byFile[fi])}</span>`; }).join(' ');
+}
+function placesHtml(t){
+  return t.inFiles.map(fi=>`<span class="dot" style="${fc(state.files[fi])}" title="${esc(state.files[fi].label)}"></span>`).join('');
+}
 function renderResult(){
-  const box = $('#result'), res = state.res;
-  if(!res){ box.innerHTML = '<h2>결과</h2><div class="empty">두 파일을 올리면 결과가 여기에 나타납니다.</div>'; return; }
-  const {A,B,rules} = state;
+  const box = $('#result'), res = state.res, files = state.files;
+  if(!res){ box.innerHTML = '<h2>결과</h2><div class="empty">파일을 2개 이상 올리면 결과가 여기에 나타납니다.</div>'; return; }
+  const N = files.length;
   let html = `<h2>결과</h2>
   <div class="summary">
-    <div class="stat hot"><div class="k">양쪽 모두 있음 (중복)</div><div class="v">${res.groups.length.toLocaleString()}</div></div>
-    <div class="stat"><div class="k">${esc(A.label)}에만 있음</div><div class="v">${res.onlyA.toLocaleString()} <span class="meta">/ ${A.rows.length.toLocaleString()}</span></div></div>
-    <div class="stat"><div class="k">${esc(B.label)}에만 있음</div><div class="v">${res.onlyB.toLocaleString()} <span class="meta">/ ${B.rows.length.toLocaleString()}</span></div></div>
+    <div class="stat"><div class="k">전체 대상물 (중복 합침)</div><div class="v">${res.targets.length.toLocaleString()}</div></div>
+    <div class="stat hot"><div class="k">2개 이상 목록에 있음</div><div class="v">${res.multi.toLocaleString()}</div></div>
+    ${N>2?`<div class="stat hot"><div class="k">모든 목록(${N}개)에 있음</div><div class="v">${res.every.toLocaleString()}</div></div>`:''}
     <div class="stat near"><div class="k">인근 주소 묶음</div><div class="v">${res.near.length.toLocaleString()} <span class="meta">묶음 · 대상 ${res.near.reduce((n,g)=>n+g.members.length,0)}곳</span></div></div>
   </div>
+  <div class="summary">${files.map((f,fi)=>`<div class="stat" style="${fc(f)}"><div class="k">${esc(f.label)}에만 있음</div><div class="v">${res.perFile[fi].onlyT.toLocaleString()} <span class="meta">/ ${f.rows.length.toLocaleString()}행</span></div></div>`).join('')}</div>
   ${res.cands.length?`<div class="hint">철자가 비슷해서 같은 대상일 수 있는 후보가 <b>${res.cands.length}쌍</b> 있습니다. <button type="button" class="linkbtn" data-tab="fuzzy">비슷한 후보 확인하기</button></div>`:''}
+  ${res.innerT?`<div class="hint">한 파일 안에 같은 대상이 두 번 이상 들어 있는 경우가 <b>${res.innerT}건</b> 있습니다. <button type="button" class="linkbtn" data-tab="matrix" data-setfilter="inner">확인하기</button></div>`:''}
   ${res.unparsed?`<div class="meta">주소를 읽지 못한 대상 ${res.unparsed}곳은 묶음에서 빠집니다. "○○로 123" 같은 도로명주소나 "○○동 123" 같은 지번주소 형식이어야 합니다.</div>`:''}
   <div class="sheetplan">
     <div class="meta">통합 결과 파일의 시트 구성</div>
     <ol>
-      <li><b>요약</b> 부서별 건수와 비교 기준</li>
-      <li><b>중복대상</b> 양쪽에 다 있는 ${res.groups.length}건, 두 부서 정보를 한 줄에 나란히</li>
-      <li><b>${esc(A.label)}에만</b> ${res.onlyA}건</li>
-      <li><b>${esc(B.label)}에만</b> ${res.onlyB}건</li>
+      <li><b>요약</b> 파일별 건수와 비교 기준</li>
+      <li><b>대조표</b> 전체 대상물 ${res.targets.length}곳이 각 목록에 있는지 ○ 표시</li>
+      <li><b>중복대상</b> 2개 이상 목록에 있는 ${res.multi}곳, 목록별 정보를 한 줄에 나란히</li>
+      <li><b>○○에만</b> 파일마다 그 목록에만 있는 대상 (${N}개 시트)</li>
       <li><b>배분용 전체대상</b> 중복을 하나로 합친 ${res.targets.length}곳, 인근 묶음끼리 붙여서 정렬</li>
-      <li><b>${esc(A.label)} 전체</b>, <b>${esc(B.label)} 전체</b> 원본 전체에 중복 행 노란색 표시</li>
+      <li><b>○○ 전체</b> 파일마다 원본 전체에 중복 행 노란색 표시 (${N}개 시트)</li>
     </ol>
   </div>
   <div class="dl">
     <button class="primary" data-dl="all" type="button">통합 결과 파일 내려받기</button>
-    <button data-dl="A" type="button">${esc(A.label)} 표시본만</button>
-    <button data-dl="B" type="button">${esc(B.label)} 표시본만</button>
+    ${files.map(f=>`<button data-dl="f${f.id}" type="button" class="small">${esc(f.label)} 표시본</button>`).join('')}
   </div>
   <div class="mapdl">
     <div><b>현장점검 지도로 보내기</b>
@@ -619,110 +710,135 @@ function renderResult(){
     </div>
   </div>
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected="${state.tab==='list'}" data-tab="list">중복대상</button>
+    <button role="tab" aria-selected="${state.tab==='matrix'}" data-tab="matrix">대조표</button>
     <button role="tab" aria-selected="${state.tab==='fuzzy'}" data-tab="fuzzy">비슷한 후보${res.cands.length?` <span class="count">${res.cands.length}</span>`:''}</button>
     <button role="tab" aria-selected="${state.tab==='near'}" data-tab="near">인근 주소 묶음</button>
-    <button role="tab" aria-selected="${state.tab==='A'}" data-tab="A">${esc(A.label)}</button>
-    <button role="tab" aria-selected="${state.tab==='B'}" data-tab="B">${esc(B.label)}</button>
+    ${files.map(f=>`<button role="tab" aria-selected="${state.tab==='f'+f.id}" data-tab="f${f.id}" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</button>`).join('')}
   </div>`;
-  if(state.tab==='list'){
-    if(!res.groups.length) html += '<div class="empty">겹치는 대상물이 없습니다. 비교 기준 열이 맞는지, 기호 무시 옵션이 필요한지 확인해 보세요.</div>';
-    else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>${esc(A.label)} 값</th><th>${esc(B.label)} 값</th><th>A 행</th><th>B 행</th><th>판정</th></tr></thead><tbody>
-      ${res.groups.map((g,i)=>`<tr><td class="num">${i+1}</td><td>${esc(g.label)}</td><td>${esc(g.labelB)}</td><td class="refs">${refs(g.aRows,'A')}</td><td class="refs">${refs(g.bRows,'B')}</td><td>${g.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost" data-unalias="${g.bObjs.filter(r=>r.manual).map(r=>r.excelRow).join(',')}">취소</button>`:'<span class="meta">자동 일치</span>'}</td></tr>`).join('')}
+  const LIMIT = 500;
+  if(state.tab==='matrix'){
+    const flt = state.filter;
+    let list = res.targets;
+    if(flt==='dup') list = list.filter(t=>t.n>1);
+    else if(flt==='every') list = list.filter(t=>t.n===N);
+    else if(flt==='inner') list = list.filter(t=>t.inner);
+    else if(flt.startsWith('only')){ const fi=+flt.slice(4); list = list.filter(t=>t.n===1 && t.inFiles[0]===fi); }
+    if(flt==='dup' || flt==='every') list = list.slice().sort((x,y)=>(y.n-x.n)||(x.order-y.order));
+    const chips = [['dup','2개 이상 목록'],...(N>2?[['every','모든 목록']]:[]),['all','전체'],...files.map((f,fi)=>['only'+fi, f.label+'에만']),...(res.innerT?[['inner','파일 안 중복']]:[])];
+    html += `<div class="toolbar"><div class="chips">${chips.map(([k,t])=>`<button aria-pressed="${flt===k}" data-filter="${k}" type="button">${esc(t)}</button>`).join('')}</div>
+      <span class="meta">${list.length.toLocaleString()}곳${list.length>LIMIT?` · 앞의 ${LIMIT}곳만 표시`:''}</span></div>`;
+    if(!list.length) html += '<div class="empty">해당하는 대상물이 없습니다.</div>';
+    else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th>
+        ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</th>`).join('')}<th>인근묶음</th><th>판정</th></tr></thead><tbody>
+      ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td>${esc(t.name)}</td><td>${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td>
+        ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?`<span>○ ${refList(t.byFile[fi])}</span>`:'<span class="meta">–</span>'}</td>`).join('')}
+        <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
+        <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}</td></tr>`).join('')}
       </tbody></table></div>`;
   }else if(state.tab==='fuzzy'){
     if(state.fuzzy<0) html += '<div class="empty">오타 의심 후보 찾기가 꺼져 있습니다. 비교 기준의 옵션에서 켤 수 있습니다.</div>';
     else if(!res.cands.length) html += '<div class="empty">철자가 비슷한 후보가 없습니다.</div>';
-    else html += `<div class="toolbar"><span class="meta">글자를 자음·모음 단위로 쪼개 비교한 유사도입니다. 주소까지 같으면 같은 대상일 가능성이 높습니다.</span>
-        <button type="button" data-allok>보이는 후보 모두 같은 대상으로</button></div>
-      <div class="tbl"><table><thead><tr><th class="num">유사도</th><th>${esc(A.label)}</th><th>${esc(B.label)}</th><th>주소</th><th>판정</th></tr></thead><tbody>
-      ${res.cands.map(c=>`<tr><td class="num"><b class="${c.sim>=0.9?'simhi':''}">${Math.round(c.sim*100)}%</b></td>
-        <td>${esc(rules.map(r=>c.a.cells[r.a]).join(' / '))}<div class="meta">${c.a.excelRow}행${addrOf('A',c.a)?' · '+esc(addrOf('A',c.a)):''}</div></td>
-        <td>${esc(rules.map(r=>c.b.cells[r.b]).join(' / '))}<div class="meta">${c.b.excelRow}행${addrOf('B',c.b)?' · '+esc(addrOf('B',c.b)):''}</div></td>
-        <td>${c.addrSame?'<span class="pill">같은 주소</span>':'<span class="meta">다름/모름</span>'}</td>
-        <td><div class="chips"><button type="button" data-ok="${c.id}">같은 대상</button><button type="button" data-no="${c.id}">다른 대상</button></div></td></tr>`).join('')}
-      </tbody></table></div>`;
+    else{
+      const cell = r => { const f=files[r.fi]; return `<td style="${fc(f)}"><span class="tag">${letter(f)}</span> ${esc(f.keys.map(i=>r.cells[i]).join(' / '))}<div class="meta">${esc(f.label)} ${r.excelRow}행${r.addrTxt?' · '+esc(r.addrTxt):''}</div></td>`; };
+      html += `<div class="toolbar"><span class="meta">글자를 자음·모음 단위로 쪼개 비교한 유사도입니다. 주소까지 같으면 같은 대상일 가능성이 높습니다.</span>
+          <button type="button" data-allok>보이는 후보 모두 같은 대상으로</button></div>
+        <div class="tbl"><table><thead><tr><th class="num">유사도</th><th>목록 1</th><th>목록 2</th><th>주소</th><th>판정</th></tr></thead><tbody>
+        ${res.cands.slice(0,LIMIT).map(c=>`<tr><td class="num"><b class="${c.sim>=0.9?'simhi':''}">${Math.round(c.sim*100)}%</b></td>${cell(c.a)}${cell(c.b)}
+          <td>${c.addrSame?'<span class="pill">같은 주소</span>':'<span class="meta">다름/모름</span>'}</td>
+          <td><div class="chips"><button type="button" data-ok="${c.id}">같은 대상</button><button type="button" data-no="${c.id}">다른 대상</button></div></td></tr>`).join('')}
+        </tbody></table></div>`;
+    }
   }else if(state.tab==='near'){
-    const srcPill = t => t.src==='both' ? '<span class="pill">양쪽</span>' : `<span class="tag ${t.src}">${esc(state[t.src].label)}</span>`;
-    if(state.near.span<0) html += '<div class="empty">묶음 범위가 "묶지 않음"으로 되어 있습니다.</div>';
+    if(state.span<0) html += '<div class="empty">묶음 범위가 "묶지 않음"으로 되어 있습니다.</div>';
     else if(!res.near.length) html += '<div class="empty">가까운 주소끼리 묶인 대상이 없습니다. 주소 열과 묶음 범위를 확인해 보세요.</div>';
-    else html += `<div class="tbl"><table><thead><tr><th>묶음</th><th>위치</th><th>출처</th><th>대상물</th><th>주소</th><th>A 행</th><th>B 행</th></tr></thead><tbody>
-      ${res.near.map((g,gi)=>g.members.map((t,i)=>`<tr class="${gi%2?'grp2':'grp1'}">${i===0?`<td rowspan="${g.members.length}"><b>${g.id}</b></td><td rowspan="${g.members.length}">${esc(g.where)}</td>`:''}<td>${srcPill(t)}</td><td>${esc(t.name)}</td><td>${esc(t.addr)}</td><td class="refs">${refs(t.rowsA.map(r=>r.excelRow),'A')}</td><td class="refs">${refs(t.rowsB.map(r=>r.excelRow),'B')}</td></tr>`).join('')).join('')}
+    else html += `<div class="tbl"><table><thead><tr><th>묶음</th><th>위치</th><th>있는 목록</th><th>대상물</th><th>주소</th><th>원본 행</th></tr></thead><tbody>
+      ${res.near.map((g,gi)=>g.members.map((t,i)=>`<tr class="${gi%2?'grp2':'grp1'}">${i===0?`<td rowspan="${g.members.length}"><b>${g.id}</b></td><td rowspan="${g.members.length}">${esc(g.where)}</td>`:''}<td>${placesHtml(t)}</td><td>${esc(t.name)}</td><td>${esc(t.addr)}</td><td class="refs">${refsHtml(t,-1)}</td></tr>`).join('')).join('')}
       </tbody></table></div>`;
   }else{
-    const side = state.tab, f = state[side], other = side==='A'?'B':'A';
+    const fi = files.findIndex(f=>'f'+f.id===state.tab), f = files[fi];
     let rows = f.rows;
-    if(state.filter==='dup') rows = rows.filter(r=>r.other);
-    if(state.filter==='no') rows = rows.filter(r=>!r.other);
-    const LIMIT = 500;
+    if(state.ffilter==='dup') rows = rows.filter(r=>r.target.n>1);
+    if(state.ffilter==='no') rows = rows.filter(r=>r.target.n===1);
     html += `<div class="toolbar"><div class="chips">
-      ${[['all','전체'],['dup','중복'],['no',f.label+'에만']].map(([k,t])=>`<button aria-pressed="${state.filter===k}" data-filter="${k}" type="button">${t}</button>`).join('')}
+      ${[['all','전체'],['dup','다른 목록에도 있음'],['no',f.label+'에만']].map(([k,t])=>`<button aria-pressed="${state.ffilter===k}" data-ffilter="${k}" type="button">${esc(t)}</button>`).join('')}
       </div><span class="meta">${rows.length.toLocaleString()}개 행${rows.length>LIMIT?` · 앞의 ${LIMIT}개만 표시`:''}</span></div>
-      <div class="tbl"><table><thead><tr><th class="num">행</th><th>중복여부</th><th>${esc(state[other].label)} 행</th><th>인근묶음</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
-      ${rows.slice(0,LIMIT).map(r=>`<tr class="${r.other?'dup':''}"><td class="num">${r.excelRow}</td><td>${r.other?'<span class="pill">중복</span>':'<span class="pill no">–</span>'}</td><td class="refs">${r.other?refs(r.other,other):''}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}
+      <div class="tbl"><table><thead><tr><th class="num">행</th><th>중복여부</th><th>다른 목록</th><th>인근묶음</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.slice(0,LIMIT).map(r=>{ const t=r.target; return `<tr class="${t.n>1?'dup':''}"><td class="num">${r.excelRow}</td><td>${t.n>1?`<span class="pill">${t.n}개 목록</span>`:'<span class="pill no">–</span>'}${t.byFile[fi].length>1?' <span class="pill inner">파일 안 중복</span>':''}</td><td class="refs">${refsHtml(t,fi)}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`; }).join('')}
       </tbody></table></div>`;
   }
-  html += `<p class="foot">표시본은 원본 오른쪽에 <b>중복여부</b>와 <b>상대 부서 행</b> 열이 붙고, 중복 행은 노란색으로 칠해집니다. 행 번호는 원본 엑셀의 행 번호입니다. 원본의 셀 서식(글꼴·테두리·색)은 단순하게 바뀔 수 있으니 원본은 따로 보관하세요.</p>`;
+  html += `<p class="foot">원본 행 번호 앞의 글자(A, B, C…)는 파일 카드의 글자입니다. 표시본은 원본 오른쪽에 <b>중복여부</b>, <b>다른 목록 위치</b>, <b>인근묶음</b> 열이 붙고 중복 행은 노란색으로 칠해집니다. 원본의 셀 서식은 단순하게 바뀔 수 있으니 원본은 따로 보관하세요.</p>`;
   box.innerHTML = html;
-  box.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; renderResult(); }));
+  box.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; if(b.dataset.setfilter) state.filter=b.dataset.setfilter; renderResult(); }));
   box.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{ state.filter=b.dataset.filter; renderResult(); }));
+  box.querySelectorAll('[data-ffilter]').forEach(b=>b.addEventListener('click',()=>{ state.ffilter=b.dataset.ffilter; renderResult(); }));
   box.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>download(b.dataset.dl)));
   const mt = box.querySelector('#mapTeam'); if(mt) mt.addEventListener('change',e=>{ state.mapTeam = e.target.value; });
-  const confirmPair = id => { const [a,b] = id.split('|').map(Number); state.alias.set(b,a); };
-  box.querySelectorAll('[data-ok]').forEach(b=>b.addEventListener('click',()=>{ confirmPair(b.dataset.ok); compare(); renderResult(); toast('같은 대상으로 확정했습니다. 중복대상에 들어갑니다'); }));
+  const confirmPair = id => { const [x,y] = id.split('|'); state.aliases.push([x,y]); };
+  box.querySelectorAll('[data-ok]').forEach(b=>b.addEventListener('click',()=>{ confirmPair(b.dataset.ok); compare(); renderResult(); toast('같은 대상으로 확정했습니다'); }));
   box.querySelectorAll('[data-no]').forEach(b=>b.addEventListener('click',()=>{ state.rejected.add(b.dataset.no); compare(); renderResult(); }));
   box.querySelectorAll('[data-allok]').forEach(b=>b.addEventListener('click',()=>{
-    const used = new Set(); let n=0;
-    res.cands.forEach(c=>{ if(used.has(c.b.excelRow)) return; used.add(c.b.excelRow); confirmPair(c.id); n++; });
+    let n=0; res.cands.slice(0,LIMIT).forEach(c=>{ confirmPair(c.id); n++; });
     compare(); renderResult(); toast(`${n}쌍을 같은 대상으로 확정했습니다`);
   }));
-  box.querySelectorAll('[data-unalias]').forEach(b=>b.addEventListener('click',()=>{ b.dataset.unalias.split(',').forEach(x=>state.alias.delete(+x)); compare(); renderResult(); }));
+  box.querySelectorAll('[data-unalias]').forEach(b=>b.addEventListener('click',()=>{
+    const ids = new Set(b.dataset.unalias.split(','));
+    state.aliases = state.aliases.filter(([x,y])=>!ids.has(x) && !ids.has(y));
+    compare(); renderResult();
+  }));
 }
-function renderNear(){
-  const box = $('#nearRow');
-  if(!state.A||!state.B){ box.innerHTML='<span class="meta">두 파일을 올리면 주소 열을 고를 수 있습니다.</span>'; return; }
-  const opt = (side,k) => `<option value="-1" ${state.near[k]===-1?'selected':''}>사용 안 함</option>` + state[side].headers.map((h,j)=>`<option value="${j}" ${j===state.near[k]?'selected':''}>${esc(h)}</option>`).join('');
-  const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'묶지 않음']];
-  box.innerHTML = `<label class="f"><span><span class="tag A">A</span> ${esc(state.A.label)} 주소 열</span><select id="nearA">${opt('A','a')}</select></label>
-    <label class="f"><span><span class="tag B">B</span> ${esc(state.B.label)} 주소 열</span><select id="nearB">${opt('B','b')}</select></label>
-    <label class="f">묶음 범위<select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.near.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
-  $('#nearA').addEventListener('change',e=>{ state.near.a=+e.target.value; compare(); renderResult(); });
-  $('#nearB').addEventListener('change',e=>{ state.near.b=+e.target.value; compare(); renderResult(); });
-  $('#nearSpan').addEventListener('change',e=>{ state.near.span=+e.target.value; compare(); renderResult(); });
-}
-function refreshAll(){ clampNear(); renderPanel('A'); renderPanel('B'); renderRules(); renderNear(); compare(); renderResult(); }
+function refreshAll(){ renderFiles(); compare(); renderItems(); renderNear(); renderResult(); }
 
 /* ---------- 업로드 ---------- */
-let pickSide = 'A';
-function pick(side){ pickSide=side; const inp=$('#fileInput'); inp.value=''; inp.click(); }
-$('#fileInput').addEventListener('change',e=>{ if(e.target.files[0]) handleFile(pickSide,e.target.files[0]); });
-async function handleFile(side, file){
-  try{
-    const wb = await readFile(file);
-    state[side] = {name:file.name, label:file.name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'').slice(0,20) || ('파일 '+side), wb, sheet:wb.SheetNames[0], headerRow:1, sample:false};
-    state.near[side.toLowerCase()]=null; resetDecisions();
-    loadSheet(side);
-    if(!(state.A && state.A.sample) && !(state.B && state.B.sample)) $('#sampleNote').hidden = true;
-    else $('#sampleNote').textContent = `파일 ${side}를 올렸습니다. 다른 쪽은 아직 예시 데이터입니다.`;
-    state.rules=[]; guessRules();
-    refreshAll();
-    toast(`${file.name} 을(를) 불러왔습니다`);
-  }catch(err){
-    console.error(err);
-    toast('파일을 읽지 못했습니다. 엑셀(.xlsx/.xls) 또는 CSV 파일인지 확인해 주세요.');
+let pickIdx = -1;
+function pick(idx){ pickIdx=idx; const inp=$('#fileInput'); inp.multiple = idx<0; inp.value=''; inp.click(); }
+$('#fileInput').addEventListener('change',e=>{ if(e.target.files.length) handleFiles([...e.target.files], pickIdx); });
+function freeColor(){ for(let c=0;c<MAXF;c++) if(!state.files.some(f=>f.color===c)) return c; return 0; }
+function newFile(name, wb, label, sample){
+  const f = {id: ++fileSeq, name, wb, sheet: wb.SheetNames[0], headerRow:1, hdrAuto:true, keys:[], addr:null, sample:!!sample,
+    label: label || name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'').slice(0,20) || '파일', color: freeColor()};
+  loadSheet(f);
+  return f;
+}
+function updateSampleNote(){
+  const n = state.files.filter(f=>f.sample).length;
+  const note = $('#sampleNote');
+  note.hidden = n===0;
+  if(n && n<state.files.length) note.textContent = `예시 파일 ${n}개가 남아 있습니다. 필요 없으면 "빼기"를 누르세요.`;
+}
+async function handleFiles(list, replaceIdx){
+  list = list.filter(f=>/\.(xlsx|xlsm|xls|csv)$/i.test(f.name));
+  if(!list.length){ toast('엑셀(.xlsx/.xls) 또는 CSV 파일을 올려 주세요'); return; }
+  let added = 0, failed = 0;
+  for(const file of list){
+    try{
+      const wb = await readFile(file);
+      // 처음 실제 파일을 읽으면 예시 파일은 모두 뺀다
+      if(state.files.length && state.files.every(f=>f.sample)){ state.files = []; state.aliases=[]; state.rejected=new Set(); state.tab='matrix'; replaceIdx=-1; }
+      if(replaceIdx<0 && state.files.length>=MAXF){ toast(`파일은 최대 ${MAXF}개까지 올릴 수 있습니다`); break; }
+      if(replaceIdx>=0){
+        const old = state.files[replaceIdx];
+        dropDecisions(old.id);
+        const nf = newFile(file.name, wb); nf.color = old.color;
+        state.files[replaceIdx] = nf;
+        if(state.tab==='f'+old.id) state.tab='f'+nf.id;
+        replaceIdx = -1;
+      }else state.files.push(newFile(file.name, wb));
+      added++;
+    }catch(err){ console.error(err); failed++; }
   }
+  updateSampleNote(); refreshAll();
+  toast(failed ? `${added}개를 불러왔고 ${failed}개는 읽지 못했습니다` : `${added}개 파일을 불러왔습니다`);
 }
 
 /* ---------- 내려받기 ---------- */
-const HEAD = {font:{bold:true},fill:{patternType:'solid',fgColor:{rgb:'F5C542'}},alignment:{vertical:'center'}};
-const HEAD_A = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'1F5A8A'}}};
-const HEAD_B = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'2F7A5A'}}};
-const HEAD_N = {font:{bold:true},fill:{patternType:'solid',fgColor:{rgb:'E4E8EC'}}};
-const FILL = {fill:{patternType:'solid',fgColor:{rgb:'FFF2B3'}}};
-const NEAR = {font:{bold:true,color:{rgb:'1F5A8A'}},fill:{patternType:'solid',fgColor:{rgb:'DCEAF6'}}};
-const BAND = [{fill:{patternType:'solid',fgColor:{rgb:'E8F1F9'}}},{fill:{patternType:'solid',fgColor:{rgb:'D3E4F3'}}}];
+const S = rgb => ({patternType:'solid',fgColor:{rgb}});
+const HEAD = {font:{bold:true},fill:S('F5C542'),alignment:{vertical:'center'}};
+const HEAD_N = {font:{bold:true},fill:S('E4E8EC')};
+const headOf = f => ({font:{bold:true,color:{rgb:'FFFFFF'}},fill:S(XL_COLORS[f.color])});
+const FILL = {fill:S('FFF2B3')};
+const NEAR = {font:{bold:true,color:{rgb:'1F5A8A'}},fill:S('DCEAF6')};
+const BAND = [{fill:S('E8F1F9')},{fill:S('D3E4F3')}];
 const enc = XLSX.utils.encode_cell;
-
 function safeSheetName(name, used){
   let base = String(name).replace(/[\[\]:*?\/\\]/g,' ').trim().slice(0,31) || '시트';
   let n = base, i = 2;
@@ -745,24 +861,29 @@ function finishTable(ws, aoa){
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(aoa.length-1,0),c:Math.max(aoa[0].length-1,0)}})};
   ws['!freeze'] = {xSplit:0,ySplit:1};
 }
+const otherText = (t, fi) => t.inFiles.filter(x=>x!==fi).map(x=>`${state.files[x].label} ${refList(t.byFile[x])}행`).join(' / ');
+const placesText = t => t.inFiles.map(x=>state.files[x].label).join(', ');
 
-/* 원본 시트 + 중복 표시 */
-function markSheet(side){
-  const f = state[side], other = side==='A'?'B':'A';
+/* 원본 시트 + 표시 */
+function markSheet(fi){
+  const f = state.files[fi];
   const ws = cloneSheet(f.wb.Sheets[f.sheet]);
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
   const c1 = f.colOffset + f.headers.length, c2 = c1 + 1, c3 = c1 + 2;
   const hr = f.headerRow - 1;
   ws[enc({r:hr,c:c1})] = {t:'s',v:'중복여부',s:HEAD};
-  ws[enc({r:hr,c:c2})] = {t:'s',v:`${state[other].label} 행`,s:HEAD};
-  ws[enc({r:hr,c:c3})] = {t:'s',v:'인근묶음',s:HEAD_A};
+  ws[enc({r:hr,c:c2})] = {t:'s',v:'다른 목록 위치',s:HEAD};
+  ws[enc({r:hr,c:c3})] = {t:'s',v:'인근묶음',s:{...NEAR}};
   f.rows.forEach(row=>{
-    if(row.near) ws[enc({r:row.excelRow-1,c:c3})] = {t:'s',v:row.near,s:NEAR};
-    if(!row.other) return;
-    const r = row.excelRow - 1;
-    ws[enc({r,c:c1})] = {t:'s',v:'중복',s:{...FILL,font:{bold:true,color:{rgb:'9A5B00'}}}};
-    ws[enc({r,c:c2})] = {t:'s',v:row.other.join(', '),s:FILL};
-    for(let c=range.s.c;c<c1;c++){
+    const r = row.excelRow - 1, t = row.target;
+    if(row.near) ws[enc({r,c:c3})] = {t:'s',v:row.near,s:NEAR};
+    const inner = t.byFile[fi].length>1;
+    if(t.n<2 && !inner) return;
+    const label = t.n>1 ? `중복(${t.n}개 목록)` + (inner?' · 파일 안 중복':'') : '파일 안 중복';
+    const where = [otherText(t,fi), inner ? `같은 파일 ${t.byFile[fi].filter(x=>x!==row).map(x=>x.excelRow).join(',')}행` : ''].filter(Boolean).join(' / ');
+    ws[enc({r,c:c1})] = {t:'s',v:label,s:{...FILL,font:{bold:true,color:{rgb:'9A5B00'}}}};
+    ws[enc({r,c:c2})] = {t:'s',v:where,s:FILL};
+    if(t.n>1) for(let c=range.s.c;c<c1;c++){
       const a = enc({r,c});
       if(!ws[a]) ws[a] = {t:'s',v:''};
       ws[a].s = Object.assign({}, ws[a].s||{}, FILL);
@@ -772,58 +893,49 @@ function markSheet(side){
   range.e.r = Math.max(range.e.r, hr);
   ws['!ref'] = XLSX.utils.encode_range(range);
   const cols = ws['!cols'] ? ws['!cols'].slice() : [];
-  cols[c1] = {wch:9}; cols[c2] = {wch:14}; cols[c3] = {wch:10};
+  cols[c1] = {wch:16}; cols[c2] = {wch:24}; cols[c3] = {wch:10};
   ws['!cols'] = cols;
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:hr,c:range.s.c},e:{r:range.e.r,c:c3}})};
   return ws;
 }
-function buildMarked(side){
-  const f = state[side], out = XLSX.utils.book_new();
-  f.wb.SheetNames.forEach(n=>{
-    XLSX.utils.book_append_sheet(out, n===f.sheet ? markSheet(side) : cloneSheet(f.wb.Sheets[n]), n);
-  });
+function buildMarked(fi){
+  const f = state.files[fi], out = XLSX.utils.book_new();
+  f.wb.SheetNames.forEach(n=>XLSX.utils.book_append_sheet(out, n===f.sheet ? markSheet(fi) : cloneSheet(f.wb.Sheets[n]), n));
   return out;
 }
-
-/* 통합 결과 파일 */
-const srcName = t => t.src==='both' ? '양쪽(중복)' : state[t.src].label;
 function orderedTargets(){
   const res = state.res, ordered = [];
   res.near.forEach(g=>g.members.forEach(t=>ordered.push([g,t])));
   const rest = res.targets.filter(t=>!t.near).sort((x,y)=>{
-    if(!x.pa && !y.pa) return 0; if(!x.pa) return 1; if(!y.pa) return -1;
+    if(!x.pa && !y.pa) return x.order-y.order; if(!x.pa) return 1; if(!y.pa) return -1;
     return x.pa.road.localeCompare(y.pa.road,'ko') || x.pa.num - y.pa.num;
   });
   rest.forEach(t=>ordered.push([null,t]));
   return ordered;
+}
+function stamp(withTime){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}` + (withTime?` ${p(d.getHours())}:${p(d.getMinutes())}`:'');
 }
 
 /* 현장점검 지도(field-check)용 파일
    - 지도는 열 이름 키워드로 이름·주소·그룹/팀·추가정보를 찾음 → 열 이름을 이름/주소/팀/비고로 고정
    - 지도는 빈 칸을 위 칸 값으로 채움(병합 셀 처리) → 모든 칸을 비우지 않음, 주소 없는 대상은 제외
    - 지도의 엑셀 읽기는 기본 머리글 행이 2행 → 1행에 제목, 2행에 머리글을 둠 */
-function mapNameOf(t){
-  const r0 = state.rules[0];
-  if(t.rowsA.length) return String(t.rowsA[0].cells[r0.a] ?? '').trim();
-  return String(t.rowsB[0].cells[r0.b] ?? '').trim();
-}
 function buildFieldCheck(){
-  const {A,B} = state;
-  const now = new Date(), d2 = n => String(n).padStart(2,'0');
-  const title = `현장점검 지도용 · ${A.label} + ${B.label} · ${now.getFullYear()}-${d2(now.getMonth()+1)}-${d2(now.getDate())}`;
+  const files = state.files;
+  const title = `현장점검 지도용 · ${files.map(f=>f.label).join(' + ')} · ${stamp()}`;
   const rows = [[title,'','',''],['이름','주소','팀','비고']];
   let skipped = 0, gi = -1, last = null;
   const bands = [];
   orderedTargets().forEach(([g,t])=>{
-    const name = mapNameOf(t) || t.name;
+    const name = t.name1 || t.name;
     if(!t.addr || !name){ skipped++; return; }
     const team = state.mapTeam==='near' ? (g ? g.id : '단독') : '미배정';
-    const where = [];
-    where.push(srcName(t));
-    if(g) where.push(`${g.id}(${g.where})`);
-    const refsTxt = [t.rowsA.length?`${A.label} ${t.rowsA.map(r=>r.excelRow).join(',')}행`:'', t.rowsB.length?`${B.label} ${t.rowsB.map(r=>r.excelRow).join(',')}행`:''].filter(Boolean).join(' / ');
-    where.push(refsTxt);
-    rows.push([name, t.addr, team, where.join(' · ')]);
+    const note = [t.n>1 ? `${t.n}개 목록(${placesText(t)})` : placesText(t)];
+    if(g) note.push(`${g.id}(${g.where})`);
+    note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}행`).join(' / '));
+    rows.push([name, t.addr, team, note.join(' · ')]);
     if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -838,60 +950,74 @@ function buildFieldCheck(){
   return {wb, count: rows.length-2, skipped};
 }
 function buildCombined(){
-  const {A,B,res,rules} = state;
+  const {files,res} = state;
   const wb = XLSX.utils.book_new(), used = new Set();
-  const now = new Date();
-  const stamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const opts = [$('#optSpace').checked&&'띄어쓰기 무시',$('#optCase').checked&&'대소문자 무시',$('#optPunct').checked&&'기호 무시'].filter(Boolean).join(', ') || '없음';
 
   // 1. 요약
-  const sum = [
-    ['구분','파일명','전체','중복','단독'],
-    [A.label, A.name, A.rows.length, res.dupA, res.onlyA],
-    [B.label, B.name, B.rows.length, res.dupB, res.onlyB],
-    [],
-    ['겹치는 대상물', res.groups.length],
-    ['그중 직접 확정', res.groups.filter(g=>g.manual).length],
+  const sum = [['구분','파일명','전체 행','다른 목록과 중복','이 목록에만','파일 안 중복']];
+  files.forEach((f,fi)=>sum.push([f.label, f.name, f.rows.length, res.perFile[fi].dup, res.perFile[fi].only, res.perFile[fi].inner]));
+  sum.push([]);
+  const info = [
+    ['전체 대상물(중복 합침)', res.targets.length],
+    ['2개 이상 목록에 있음', res.multi],
+    ...(files.length>2?[[`모든 목록(${files.length}개)에 있음`, res.every]]:[]),
+    ['그중 직접 확정', res.manualT],
     ['미확인 오타 후보', res.cands.length],
-    ['비교 기준', rules.map(r=>`${A.headers[r.a]} = ${B.headers[r.b]}`).join(' 그리고 ')],
+    ...Array.from({length:state.nItems},(_,i)=>[`비교 항목 ${i+1}`, files.map(f=>`${f.label}:${f.headers[f.keys[i]]}`).join(' = ')]),
     ['비교 옵션', opts],
-    ['작성 일시', stamp]
-  ];
+    ['작성 일시', stamp(true)]];
+  const infoStart = sum.length;
+  info.forEach(r=>sum.push(r));
   const wsS = XLSX.utils.aoa_to_sheet(sum);
-  styleRow(wsS, 0, 5, HEAD_N);
-  [4,5,6,7,8,9].forEach(r=>{ const a=enc({r,c:0}); if(wsS[a]) wsS[a].s = {font:{bold:true}}; });
-  wsS['!cols'] = [{wch:14},{wch:36},{wch:8},{wch:8},{wch:8}];
+  styleRow(wsS, 0, 6, HEAD_N);
+  files.forEach((f,fi)=>{ const a=enc({r:fi+1,c:0}); wsS[a].s = {font:{bold:true,color:{rgb:XL_COLORS[f.color]}}}; });
+  info.forEach((_,i)=>{ const a=enc({r:infoStart+i,c:0}); if(wsS[a]) wsS[a].s = {font:{bold:true}}; });
+  wsS['!cols'] = [{wch:22},{wch:40},{wch:9},{wch:15},{wch:11},{wch:12}];
   XLSX.utils.book_append_sheet(wb, wsS, safeSheetName('요약', used));
 
-  // 2. 중복대상: A 정보 | B 정보 를 한 줄에
-  const head = ['번호', '인근묶음', '판정', `${A.label} 행`, ...A.headers.map(h=>`[${A.label}] ${h}`), `${B.label} 행`, ...B.headers.map(h=>`[${B.label}] ${h}`)];
+  // 2. 대조표: 대상물마다 각 목록에 있는지 ○
+  const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 행`), '인근묶음','판정'];
+  const mtx = [mh];
+  const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(x.order-y.order));
+  sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])), t.near||'',
+    [t.manual?'직접 확정':'', t.inner?'파일 안 중복':''].filter(Boolean).join(', ')]));
+  const wsM = XLSX.utils.aoa_to_sheet(mtx);
+  styleRow(wsM, 0, mh.length, HEAD_N);
+  files.forEach((f,fi)=>{ [4+fi, 4+files.length+fi].forEach(c=>{ wsM[enc({r:0,c})].s = headOf(f); }); });
+  sorted.forEach((t,i)=>{ if(t.n>1) files.forEach((f,fi)=>{ if(t.byFile[fi].length){ const a=enc({r:i+1,c:4+fi}); wsM[a].s={...FILL,alignment:{horizontal:'center'}}; } }); else files.forEach((f,fi)=>{ const a=enc({r:i+1,c:4+fi}); if(wsM[a]) wsM[a].s={alignment:{horizontal:'center'}}; }); });
+  finishTable(wsM, mtx);
+  XLSX.utils.book_append_sheet(wb, wsM, safeSheetName('대조표', used));
+
+  // 3. 중복대상: 2개 이상 목록, 목록별 정보를 한 줄에
+  const head = ['번호','인근묶음','있는 목록','판정'];
+  const spans = [];
+  files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 행`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
   const dup = [head]; let n = 0;
-  res.groups.forEach(g=>{
-    g.aObjs.forEach(ar=>g.bObjs.forEach(br=>{
-      dup.push([++n, ar.near||'', br.manual?'직접 확정':'자동 일치', ar.excelRow, ...ar.cells, br.excelRow, ...br.cells]);
-    }));
+  sorted.filter(t=>t.n>1).forEach(t=>{
+    const row = [++n, t.near||'', placesText(t), [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':''].filter(Boolean).join(', ')];
+    files.forEach((f,fi)=>{ const r = t.byFile[fi][0]; row.push(refList(t.byFile[fi]), ...f.headers.map((_,c)=> r ? r.cells[c] : '')); });
+    dup.push(row);
   });
   const wsD = XLSX.utils.aoa_to_sheet(dup);
-  const aEnd = 3 + A.headers.length;
-  for(let c=0;c<head.length;c++){ const a=enc({r:0,c}); wsD[a].s = c<=2 ? HEAD_N : (c<=aEnd ? HEAD_A : HEAD_B); }
+  for(let c=0;c<head.length;c++){ const a=enc({r:0,c}); const sp = spans.find(([s,e])=>c>=s && c<=e); wsD[a].s = sp ? headOf(sp[2]) : HEAD_N; }
   finishTable(wsD, dup);
   XLSX.utils.book_append_sheet(wb, wsD, safeSheetName('중복대상', used));
 
-  // 3·4. 한쪽에만 있는 대상
-  [['A','B'],['B','A']].forEach(([s,o])=>{
-    const f = state[s];
-    const aoa = [['원본 행', '인근묶음', '비슷한 후보(확인 필요)', ...f.headers]];
-    f.rows.filter(r=>!r.other).forEach(r=>aoa.push([r.excelRow, r.near||'', r.candTxt||'', ...r.cells]));
+  // 4. 파일마다 그 목록에만 있는 대상
+  files.forEach((f,fi)=>{
+    const aoa = [['원본 행','인근묶음','비슷한 후보(확인 필요)', ...f.headers]];
+    f.rows.filter(r=>r.target.n===1).forEach(r=>aoa.push([r.excelRow, r.near||'', r.candTxt||'', ...r.cells]));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    styleRow(ws, 0, aoa[0].length, s==='A'?HEAD_A:HEAD_B);
+    styleRow(ws, 0, aoa[0].length, headOf(f));
     finishTable(ws, aoa);
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`${f.label}에만`, used));
   });
 
-  // 5. 배분용 전체대상: 중복은 하나로, 인근 묶음끼리 붙여 정렬
+  // 5. 배분용 전체대상
   const ordered = orderedTargets();
-  const dist = [['인근묶음','묶음 범위','출처','대상물','주소',`${A.label} 행`,`${B.label} 행`,'배정 팀']];
-  ordered.forEach(([g,t])=>dist.push([g?g.id:'', g?g.where:'', srcName(t), t.name, t.addr, t.rowsA.map(r=>r.excelRow).join(', '), t.rowsB.map(r=>r.excelRow).join(', '), '']));
+  const dist = [['인근묶음','묶음 범위','있는 목록','목록 수','대상물','주소', ...files.map(f=>`${f.label} 행`),'배정 팀']];
+  ordered.forEach(([g,t])=>dist.push([g?g.id:'', g?g.where:'', placesText(t), t.n, t.name, t.addr, ...files.map((f,fi)=>refList(t.byFile[fi])), '']));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
   styleRow(wsX, 0, dist[0].length, HEAD_N);
   let gi = -1, last = null;
@@ -899,20 +1025,25 @@ function buildCombined(){
   finishTable(wsX, dist);
   XLSX.utils.book_append_sheet(wb, wsX, safeSheetName('배분용 전체대상', used));
 
-  // 6·7. 원본 전체 + 표시
-  ['A','B'].forEach(s=>XLSX.utils.book_append_sheet(wb, markSheet(s), safeSheetName(`${state[s].label} 전체`, used)));
+  // 6. 파일마다 원본 전체 + 표시
+  files.forEach((f,fi)=>XLSX.utils.book_append_sheet(wb, markSheet(fi), safeSheetName(`${f.label} 전체`, used)));
   return wb;
 }
+const fileSafe = s => s.replace(/[\\\/:*?"<>|]/g,'_');
 async function download(which){
   let wb, name;
   try{
+    const labels = state.files.map(f=>f.label);
+    const tag = labels.length>3 ? `${labels.slice(0,3).join('_')}_외${labels.length-3}` : labels.join('_');
     if(which==='map'){
       const r = buildFieldCheck(); wb = r.wb;
-      name = `현장점검지도용_${state.A.label}_${state.B.label}.xlsx`.replace(/[\\\/:*?"<>|]/g,'_');
+      name = fileSafe(`현장점검지도용_${tag}.xlsx`);
       if(r.skipped) setTimeout(()=>toast(`주소가 없는 ${r.skipped}곳은 지도용 파일에서 뺐습니다`), 3000);
+    }else if(which==='all'){ wb = buildCombined(); name = fileSafe(`크로스체크_${tag}.xlsx`); }
+    else{
+      const fi = state.files.findIndex(f=>'f'+f.id===which);
+      wb = buildMarked(fi); name = state.files[fi].name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'') + '_중복표시.xlsx';
     }
-    else if(which==='all'){ wb = buildCombined(); name = `크로스체크_${state.A.label}_${state.B.label}.xlsx`.replace(/[\\\/:*?"<>|]/g,'_'); }
-    else { wb = buildMarked(which); name = state[which].name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'') + '_중복표시.xlsx'; }
   }catch(err){ console.error(err); toast('파일을 만들지 못했습니다.'); return; }
   const buf = XLSX.write(wb,{bookType:'xlsx',type:'array'});
   const blob = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -935,14 +1066,12 @@ async function download(which){
 let tt;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true,2800); }
 
-$('#addRule').addEventListener('click',()=>{ state.rules.push({a:0,b:0}); renderRules(); compare(); renderResult(); });
+$('#addItem').addEventListener('click',()=>{ state.nItems++; refreshAll(); });
 ['optSpace','optCase','optPunct'].forEach(id=>$('#'+id).addEventListener('change',()=>{ compare(); renderResult(); }));
 $('#optFuzzy').addEventListener('change',e=>{ state.fuzzy=+e.target.value; compare(); renderResult(); });
 
 /* ---------- 시작: 예시 데이터 ---------- */
-state.A = {name:'예시_소방안전관리대상물.xlsx', label:'예방과', wb:sampleWB(sampleA,'대상물'), sheet:'대상물', headerRow:1, sample:true};
-state.B = {name:'예시_화재안전조사.xlsx', label:'대응과', wb:sampleWB(sampleB,'조사'), sheet:'조사', headerRow:1, sample:true};
-loadSheet('A'); loadSheet('B'); guessRules();
+SAMPLES.forEach(s=>state.files.push(newFile(s.name, sampleWB(s.rows, s.sheet), s.label, true)));
 refreshAll();
 })();
 </script>
