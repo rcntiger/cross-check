@@ -134,6 +134,20 @@ td .meta{font-size:14px}
 .mapdl > div:first-child{flex:1 1 280px;min-width:0}
 .hdrbox{display:flex;gap:6px;align-items:center}
 .sheetbox{display:grid;gap:6px}
+.allocbox{display:grid;gap:12px}
+.ctable{display:grid;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.cth,.ctr{display:grid;grid-template-columns:minmax(0,1.4fr) 90px minmax(0,2fr);gap:12px;align-items:center;padding:8px 12px}
+.ctable.w .cth,.ctable.w .ctr{grid-template-columns:minmax(0,1.4fr) 90px 100px minmax(0,2fr)}
+.cth{background:var(--bg);font-size:14px;color:var(--muted);font-weight:600}
+.ctr{border-top:1px solid var(--line)}
+.ctr .num,.cth span:nth-child(2),.cth span:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}
+.ctr input.teams{width:100%}
+.wrow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.wrow label.w{display:inline-flex;gap:6px;align-items:center;font-size:15px}
+.wrow input[type=number]{width:72px}
+.asum{display:grid;gap:6px}
+.asum-h{font-size:16px}
+select.tsel{padding:3px 6px}
 .schips{display:flex;flex-wrap:wrap;gap:5px}
 .schip{padding:3px 9px;font-size:14px;border-radius:6px;display:inline-flex;gap:6px;align-items:center;background:var(--bg);color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
 .schip span{font-family:var(--mono);font-size:12.5px;opacity:.75}
@@ -186,6 +200,12 @@ td .meta{font-size:14px}
     <div class="fgrid" id="nearRow"></div>
   </section>
 
+  <section class="card">
+    <h2>팀 배분 <span class="meta" style="font-weight:400">관할센터별로 팀에 나눔</span></h2>
+    <p class="meta" style="margin:0;max-width:90ch">대상을 동·도로·번호 순으로 늘어놓고 이어서 나눠, 팀마다 건수를 똑같이 맞추면서 같은 지역은 되도록 같은 팀이 맡게 합니다. 여러 목록에 함께 있는 대상은 한 팀이 한 번에 맡습니다. 결과는 아래 "팀 배분" 탭에서 보고, 대상별로 팀을 바꿀 수 있습니다.</p>
+    <div id="allocBox" class="allocbox"></div>
+  </section>
+
   <section class="card" id="result"></section>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -206,7 +226,8 @@ const state = {
   files: [],          // 올린 파일들 (순서 = 화면 순서)
   nItems: 1,          // 비교 항목 수 (파일마다 keys[i]로 열을 고름)
   span: 20,           // 인근 묶음 범위(건물번호 차이), -1 = 묶지 않음
-  fuzzy: 0.85, aliases: [], rejected: new Set(), mapTeam: 'none',
+  fuzzy: 0.85, aliases: [], rejected: new Set(), mapTeam: 'assign',
+  balance: 'perlist', combo: 0.75, gradeW: {'특급':2, '1급':1.5, '2급':1, '3급':1, '기타':1}, teams: {}, allocOverride: new Map(), tteam: '',
   tab: 'matrix', filter: 'dup', ffilter: 'all',
   res: null
 };
@@ -421,7 +442,7 @@ function loadFile(f){
     r.cells.forEach((v,c)=>{ if(String(v).trim()!=='' || cells[p.map[c]]==='') cells[p.map[c]] = v; });
     f.rows.push({excelRow:r.excelRow, part:pi, si:p.si, cells, ref: f.multi ? `${p.short} ${r.excelRow}` : String(r.excelRow)});
   }));
-  f.keys = []; f.addr = null;   // 열 선택은 다시 추측
+  f.keys = []; f.addr = null; f.centerCol = null; f.gradeCol = null;   // 열 선택은 다시 추측
 }
 
 /* ---------- 열 자동 선택 ---------- */
@@ -466,6 +487,8 @@ function ensureCols(){
     }
     f.keys.length = state.nItems;
     if(f.addr==null || f.addr>=f.headers.length) f.addr = guessAddr(f);
+    if(f.centerCol==null || f.centerCol>=f.headers.length) f.centerCol = guessCenterCol(f);
+    if(f.gradeCol==null || f.gradeCol>=f.headers.length) f.gradeCol = guessGradeCol(f);
     const isAddr = h => /주소|소재지/.test(norm(h));
     f.addrAlt = f.headers.map((h,i)=>i).filter(i=>i!==f.addr && isAddr(f.headers[i])).sort((x,y)=>(/도로명/.test(f.headers[y])-/도로명/.test(f.headers[x])));
   });
@@ -668,6 +691,8 @@ function compare(){
     return t;
   }).sort((x,y)=>x.order-y.order);
   const near = groupNear(targets);
+  prepAlloc(targets);
+  const alloc = runAlloc(targets, near);
   const cands = findCands();
   const perFile = files.map((f,fi)=>({
     dup: f.rows.filter(r=>r.target.n>1).length,
@@ -676,7 +701,7 @@ function compare(){
     inner: f.rows.filter(r=>!r.target.blank && r.target.inner && r.target.byFile[fi].filter(x=>x.si===r.si).length>1).length,
     blank: f.blank
   }));
-  state.res = {targets, near, cands, perFile,
+  state.res = {targets, near, cands, perFile, alloc,
     multi: targets.filter(t=>t.n>1).length,
     every: targets.filter(t=>t.n===files.length).length,
     innerT: targets.filter(t=>t.inner).length,
@@ -684,6 +709,126 @@ function compare(){
     unparsed: targets.filter(t=>t.addr && !t.pa).length,
     blank: files.reduce((n,f)=>n+f.blank,0),
     splitNames, ambigT: targets.filter(t=>t.addrAmbig).length};
+}
+
+/* ---------- 팀 배분 ----------
+   1) 대상마다 관할센터·등급·동·업무량을 정한다
+      - 관할센터: 줄여 쓴 이름은 긴 이름에 합친다 (대응단 → 현장대응단, 시흥 → 시흥119안전센터)
+      - 업무량 = (들어 있는 목록의 가중치 합) × (여러 목록이면 함께 방문 할인) × 등급 가중치
+   2) 센터마다 인근 묶음을 한 덩어리로 보고 동·도로·번호 순으로 늘어놓은 뒤,
+      업무량 누계가 팀 수만큼 고르게 나뉘는 자리에서 끊는다 (같은 지역은 같은 팀으로 이어짐)
+   3) 사람이 바꾼 배정은 그대로 둔다 */
+const GRADES = ['특급','1급','2급','3급','기타'];
+function gradeOf(v){
+  const s = String(v ?? '').replace(/\s/g,'');
+  if(/특급/.test(s)) return '특급';
+  const m = s.match(/([1-3])급/); if(m) return m[1]+'급';
+  return '기타';
+}
+/* 행정동 찾기: "금천구 가산동"처럼 시·구 뒤에 오는 동, 또는 "(가산동)"처럼 괄호 안의 동만 인정한다.
+   건물 안의 "가동·별관동·101동"은 쓰지 않는다. "독산4동"은 "독산동"으로 모은다. */
+function dongOf(texts){
+  const clean = d => d.replace(/\d+동$/,'동');
+  for(const s of texts){
+    const m = String(s ?? '').match(/(?:[시구군])\s+([가-힣]{2,4}?\d*동)(?=[\s\d,)]|$)/);
+    if(m) return clean(m[1]);
+  }
+  for(const s of texts){
+    const m = String(s ?? '').match(/\(([가-힣]{2,4}?\d*동)[,)]/);
+    if(m) return clean(m[1]);
+  }
+  return '';
+}
+function guessCenterCol(f){ const hs=f.headers.map(norm); let i=hs.indexOf('관할센터'); if(i<0) i=hs.findIndex(h=>/관할/.test(h) && !/관할서/.test(h)); return i; }
+function guessGradeCol(f){ const hs=f.headers.map(norm); let i=hs.indexOf('대상물구분'); if(i<0) i=hs.findIndex(h=>/등급/.test(h)); return i; }
+function targetKey(t){ return t.rows.map(r=>r.rid).sort()[0]; }
+function centerMap(raws){
+  // 짧은 이름이 정확히 하나의 긴 이름에 들어 있으면 그 긴 이름으로 합친다
+  const names = [...new Set(raws.filter(Boolean))].sort((a,b)=>b.length-a.length);
+  const map = {};
+  names.forEach(n=>{
+    const longer = names.filter(m=>m!==n && m.length>n.length && m.replace(/\s/g,'').includes(n.replace(/\s/g,'')));
+    map[n] = longer.length===1 ? (map[longer[0]] || longer[0]) : n;
+  });
+  return map;
+}
+function prepAlloc(targets){
+  const files = state.files;
+  const raws = [];
+  targets.forEach(t=>{
+    let c = '', g = '기타';
+    t.rows.forEach(r=>{
+      const f = files[r.fi];
+      if(!c && f.centerCol>=0) c = String(r.cells[f.centerCol] ?? '').trim();
+      if(f.gradeCol>=0){ const gg = gradeOf(r.cells[f.gradeCol]); if(GRADES.indexOf(gg) < GRADES.indexOf(g)) g = gg; }
+    });
+    t.centerRaw = c; t.grade = g; raws.push(c);
+    t.dong = dongOf(t.rows.flatMap(r=>[r.addrTxt, ...files[r.fi].addrAlt.map(i=>r.cells[i]), ...(files[r.fi].addr>=0?[r.cells[files[r.fi].addr]]:[])]));
+    const base = t.inFiles.reduce((s,fi)=>s + (+files[fi].weight || 0), 0);
+    t.w = Math.round(base * (t.n>1 ? state.combo : 1) * (+state.gradeW[g] || 1) * 100) / 100;
+  });
+  const anyCenter = files.some(f=>f.centerCol>=0);
+  const map = centerMap(raws);
+  targets.forEach(t=>{ t.center = anyCenter ? (map[t.centerRaw] || '관할 미지정') : '전체'; });
+}
+function teamsOf(center){
+  const v = state.teams[center];
+  const list = String(v==null ? '1팀, 2팀, 3팀' : v).split(/[,，\n]/).map(s=>s.trim()).filter(Boolean);
+  return [...new Set(list)];
+}
+function runAlloc(targets, near){
+  const byCenter = new Map();
+  targets.forEach(t=>{ let l=byCenter.get(t.center); if(!l) byCenter.set(t.center, l=[]); l.push(t); });
+  const centers = [...byCenter.keys()].sort((a,b)=>(a==='관할 미지정')-(b==='관할 미지정') || byCenter.get(b).length-byCenter.get(a).length);
+  const out = [];
+  centers.forEach(cname=>{
+    const list = byCenter.get(cname), teams = teamsOf(cname);
+    // 덩어리 = 같은 센터 안의 인근 묶음, 또는 단독 대상
+    const units = new Map();
+    list.forEach(t=>{ const k = t.near ? 'n:'+t.near : 't:'+targetKey(t); let u=units.get(k); if(!u) units.set(k, u={members:[], w:0}); u.members.push(t); u.w += t.w; });
+    const sortKey = u => { const t = u.members[0]; return [t.dong || '힣', t.pa ? t.pa.road : '힣', t.pa ? t.pa.num : 1e9]; };
+    const arr = [...units.values()].sort((a,b)=>{ const x=sortKey(a), y=sortKey(b); return x[0].localeCompare(y[0],'ko') || x[1].localeCompare(y[1],'ko') || x[2]-y[2]; });
+    const total = arr.reduce((s,u)=>s+u.w,0), k = Math.max(1, teams.length);
+    if(state.balance==='perlist'){
+      // 목록별 건수를 똑같이: 대상을 '어느 목록에 있는지'(조사만 / 훈련만 / 둘 다)로 나누고,
+      // 종류마다 지역 순서대로 늘어놓아 개수로 똑같이 나눈다. 팀 i는 종류마다 i번째 구간을 맡는다.
+      const seq = arr.flatMap(u=>u.members.slice().sort((a,b)=>(a.pa?a.pa.num:1e9)-(b.pa?b.pa.num:1e9)));
+      const byCat = new Map();
+      seq.forEach(t=>{ const c=t.inFiles.join(','); let l=byCat.get(c); if(!l) byCat.set(c, l=[]); l.push(t); });
+      byCat.forEach(l=>{
+        const n = l.length;
+        l.forEach((t,i)=>{ t.autoTeam = teams[Math.min(k-1, Math.floor(i * k / n))] || '미배정'; });
+      });
+    }else if(state.balance==='count'){
+      // 대상 수를 똑같이: 지역 순서대로 늘어놓고 개수로 정확히 나눈다 (팀 간 차이 최대 1곳)
+      // 경계에 걸린 인근 묶음만 두 팀으로 나뉠 수 있다
+      const seq = arr.flatMap(u=>u.members.slice().sort((a,b)=>(a.pa?a.pa.num:1e9)-(b.pa?b.pa.num:1e9)));
+      const N = seq.length;
+      seq.forEach((t,i)=>{ t.autoTeam = teams[Math.min(k-1, Math.floor(i*k/N))] || '미배정'; });
+    }else{
+      let cum = 0, ti = 0;
+      arr.forEach(u=>{
+        // 이 덩어리의 가운데가 다음 팀 몫으로 넘어가면 다음 팀으로
+        while(ti < k-1 && cum + u.w/2 > total*(ti+1)/k) ti++;
+        u.members.forEach(t=>{ t.autoTeam = teams[ti] || '미배정'; });
+        cum += u.w;
+      });
+    }
+    const splitNear = new Set(); units.forEach((u,key)=>{ if(key.startsWith('n:') && new Set(u.members.map(t=>t.autoTeam)).size>1) splitNear.add(key.slice(2)); });
+    list.forEach(t=>{ const o = state.allocOverride.get(targetKey(t)); t.team = (o && teams.includes(o)) ? o : t.autoTeam; t.teamManual = !!(o && teams.includes(o) && o!==t.autoTeam); });
+    const teamStats = teams.map(name=>{
+      const mine = list.filter(t=>t.team===name);
+      const dongs = {}; mine.forEach(t=>{ if(t.dong) dongs[t.dong]=(dongs[t.dong]||0)+1; });
+      return {name, count:mine.length, w:Math.round(mine.reduce((s,t)=>s+t.w,0)*10)/10,
+        multi: mine.filter(t=>t.n>1).length,
+        per: state.files.map((f,fi)=>mine.filter(t=>t.byFile[fi].length).length),
+        only: state.files.map((f,fi)=>mine.filter(t=>t.n===1 && t.inFiles[0]===fi).length),
+        grades: GRADES.map(g=>mine.filter(t=>t.grade===g).length),
+        dongs: Object.entries(dongs).sort((a,b)=>b[1]-a[1]).map(([d,n])=>`${d} ${n}`).join(', ')};
+    });
+    out.push({name:cname, teams:teamStats, count:list.length, w:Math.round(total*10)/10, split:[...splitNear], raws:[...new Set(list.map(t=>t.centerRaw).filter(r=>r && r!==cname))]});
+  });
+  return {centers: out, manual: targets.filter(t=>t.teamManual).length};
 }
 
 /* ---------- 화면: 파일 ---------- */
@@ -721,7 +866,7 @@ function renderFiles(){
     updateSampleNote(); refreshAll(); toast(`${f.label} 파일을 뺐습니다`);
   }));
   state.files.forEach(f=>{
-    $('#lbl'+f.id).addEventListener('change',e=>{ f.label = e.target.value.trim() || ('파일 '+letter(f)); e.target.value=f.label; renderItems(); renderNear(); compare(); renderResult(); });
+    $('#lbl'+f.id).addEventListener('change',e=>{ f.label = e.target.value.trim() || ('파일 '+letter(f)); e.target.value=f.label; renderItems(); renderNear(); compare(); renderAlloc(); renderResult(); });
     // 시트를 바꿔도 고른 열은 이름이 같으면 그대로 둔다
     const reload = () => {
       const keyNames = f.keys.map(i=>f.headers[i]), addrName = f.addr>=0 ? f.headers[f.addr] : null, addrOff = f.addr===-1;
@@ -804,11 +949,12 @@ function renderResult(){
   <div class="sheetplan">
     <div class="meta">통합 결과 파일의 시트 구성</div>
     <ol>
-      <li><b>요약</b> 파일별 건수와 비교 기준</li>
+      <li><b>요약</b>, <b>팀배분 요약</b> 파일별 건수와 비교 기준, 팀별 대상 수·업무량</li>
       <li><b>대조표</b> 전체 대상물 ${res.targets.length}곳이 각 목록에 있는지 ○ 표시</li>
       <li><b>중복대상</b> 2개 이상 목록에 있는 ${res.multi}곳, 목록별 정보를 한 줄에 나란히</li>
       <li><b>○○에만</b> 파일마다 그 목록에만 있는 대상 (${N}개 시트)</li>
-      <li><b>배분용 전체대상</b> 중복을 하나로 합친 ${res.targets.length}곳, 인근 묶음끼리 붙여서 정렬</li>
+      <li><b>배분용 전체대상</b> 중복을 하나로 합친 ${res.targets.length}곳, 관할센터·배정 팀·동 순으로 정렬</li>
+      <li><b>배정 ○○팀</b> 팀마다 맡을 대상 목록 (${res.alloc.centers.reduce((n,c)=>n+c.teams.length,0)}개 시트, 완료·비고 칸 포함)</li>
       <li><b>○○ 전체</b> 파일마다 원본 전체에 중복 행 노란색 표시 (${N}개 시트)</li>
     </ol>
   </div>
@@ -821,6 +967,7 @@ function renderResult(){
       <div class="meta">이름·주소·팀·비고 4개 열로 된 파일을 만듭니다. 현장점검 지도의 계획에서 "엑셀 업로드"로 올리면 그대로 인식됩니다. 중복은 한 곳으로 합쳐 들어갑니다.</div></div>
     <div class="row">
       <label class="f">팀 칸에 넣을 값<select id="mapTeam">
+        <option value="assign" ${state.mapTeam==='assign'?'selected':''}>배정 팀 (팀 배분 결과)</option>
         <option value="none" ${state.mapTeam==='none'?'selected':''}>미배정 (엑셀에서 직접 채움)</option>
         <option value="near" ${state.mapTeam==='near'?'selected':''}>인근 묶음 번호 (지도에서 묶음별 색)</option>
       </select></label>
@@ -830,6 +977,7 @@ function renderResult(){
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="${state.tab==='matrix'}" data-tab="matrix">대조표</button>
     <button role="tab" aria-selected="${state.tab==='fuzzy'}" data-tab="fuzzy">비슷한 후보${res.cands.length?` <span class="count">${res.cands.length}</span>`:''}</button>
+    <button role="tab" aria-selected="${state.tab==='alloc'}" data-tab="alloc">팀 배분</button>
     <button role="tab" aria-selected="${state.tab==='near'}" data-tab="near">인근 주소 묶음</button>
     ${files.map(f=>`<button role="tab" aria-selected="${state.tab==='f'+f.id}" data-tab="f${f.id}" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</button>`).join('')}
   </div>`;
@@ -866,6 +1014,22 @@ function renderResult(){
           <td><div class="chips"><button type="button" data-ok="${c.id}">같은 대상</button><button type="button" data-no="${c.id}">다른 대상</button></div></td></tr>`).join('')}
         </tbody></table></div>`;
     }
+  }else if(state.tab==='alloc'){
+    const A = res.alloc;
+    const isW = state.balance==='weight';
+    html += A.centers.map(c=>`<div class="asum"><div class="asum-h"><b>${esc(c.name)}</b> <span class="meta">대상 ${c.count.toLocaleString()}곳${isW?` · 업무량 ${c.w.toLocaleString()}`:''} · 팀 ${c.teams.length}개 · 팀당 약 ${Math.round(c.count/Math.max(1,c.teams.length))}곳${c.split.length?` · 경계에서 나뉜 인근 묶음 ${c.split.length}개`:''}</span></div>
+      <div class="tbl" style="max-height:none"><table><thead><tr><th>팀</th><th class="num">대상</th>${files.map(f=>`<th class="num">${esc(f.label)}</th>`).join('')}<th class="num">함께 방문</th>${files.map(f=>`<th class="num">${esc(f.label)}만</th>`).join('')}${isW?'<th class="num">업무량</th>':''}<th class="num">특급</th><th class="num">1급</th><th class="num">2급</th><th class="num">3급</th><th>주요 동</th></tr></thead><tbody>
+      ${c.teams.map(t=>{ const avgW = c.w/Math.max(1,c.teams.length); const dev = avgW ? Math.round((t.w-avgW)/avgW*100) : 0; return `<tr><td><b>${esc(t.name)}</b></td><td class="num"><b>${t.count}</b></td>${t.per.map(n=>`<td class="num">${n}</td>`).join('')}<td class="num">${t.multi}</td>${t.only.map(n=>`<td class="num">${n}</td>`).join('')}${isW?`<td class="num">${t.w} <span class="meta">${dev>0?'+':''}${dev}%</span></td>`:''}${t.grades.slice(0,4).map(n=>`<td class="num">${n}</td>`).join('')}<td class="clip ad" title="${esc(t.dongs)}">${esc(t.dongs)}</td></tr>`; }).join('')}
+      </tbody></table></div></div>`).join('');
+    const opts = A.centers.flatMap(c=>c.teams.map(t=>[c.name+'|'+t.name, (A.centers.length>1?centerShort(c.name)+' ':'')+t.name]));
+    let list = allocOrdered();
+    if(state.tteam){ const [c,tn] = state.tteam.split('|'); list = list.filter(t=>t.center===c && t.team===tn); }
+    html += `<div class="toolbar"><div class="chips"><button type="button" aria-pressed="${!state.tteam}" data-tteam="">전체</button>${opts.map(([k,lab])=>`<button type="button" aria-pressed="${state.tteam===k}" data-tteam="${esc(k)}">${esc(lab)}</button>`).join('')}</div>
+      <span class="meta">${list.length.toLocaleString()}곳${list.length>LIMIT?` · 앞의 ${LIMIT}곳만 표시`:''}</span></div>
+      <div class="tbl"><table><thead><tr><th>배정 팀</th>${A.centers.length>1?'<th>관할센터</th>':''}<th>대상물</th><th>주소</th><th>동</th><th>있는 목록</th><th>등급</th>${isW?'<th class="num">업무량</th>':''}<th>인근묶음</th><th>목록별 위치</th></tr></thead><tbody>
+      ${list.slice(0,LIMIT).map(t=>`<tr class="${t.n>1?'dup':''}"><td><select class="tsel" data-key="${esc(targetKey(t))}" aria-label="${esc(t.name)} 배정 팀">${teamsOf(t.center).map(n=>`<option ${n===t.team?'selected':''}>${esc(n)}</option>`).join('')}</select>${t.teamManual?' <span class="pill man">변경</span>':''}</td>
+        ${A.centers.length>1?`<td>${esc(centerShort(t.center))}</td>`:''}<td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td>${esc(t.dong)}</td><td>${placesHtml(t)}</td><td>${esc(t.grade)}</td>${isW?`<td class="num">${t.w}</td>`:''}<td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td><td class="refs">${refsHtml(t,-1)}</td></tr>`).join('')}
+      </tbody></table></div>`;
   }else if(state.tab==='near'){
     if(state.span<0) html += '<div class="empty">묶음 범위가 "묶지 않음"으로 되어 있습니다.</div>';
     else if(!res.near.length) html += '<div class="empty">가까운 주소끼리 묶인 대상이 없습니다. 주소 열과 묶음 범위를 확인해 보세요.</div>';
@@ -894,6 +1058,12 @@ function renderResult(){
   box.querySelectorAll('[data-ffilter]').forEach(b=>b.addEventListener('click',()=>{ state.ffilter=b.dataset.ffilter; renderResult(); }));
   box.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>download(b.dataset.dl)));
   const mt = box.querySelector('#mapTeam'); if(mt) mt.addEventListener('change',e=>{ state.mapTeam = e.target.value; });
+  box.querySelectorAll('[data-tteam]').forEach(b=>b.addEventListener('click',()=>{ state.tteam = b.dataset.tteam; renderResult(); }));
+  box.querySelectorAll('select.tsel').forEach(sel=>sel.addEventListener('change',e=>{
+    const t = state.res.targets.find(x=>targetKey(x)===sel.dataset.key);
+    if(t && e.target.value===t.autoTeam) state.allocOverride.delete(sel.dataset.key); else state.allocOverride.set(sel.dataset.key, e.target.value);
+    const y = window.scrollY; recalc(); try{ window.scrollTo(0,y); }catch(e){}
+  }));
   const confirmPair = id => { const [x,y] = id.split('|'); state.aliases.push([x,y]); };
   box.querySelectorAll('[data-ok]').forEach(b=>b.addEventListener('click',()=>{ confirmPair(b.dataset.ok); compare(); renderResult(); toast('같은 대상으로 확정했습니다'); }));
   box.querySelectorAll('[data-no]').forEach(b=>b.addEventListener('click',()=>{ state.rejected.add(b.dataset.no); compare(); renderResult(); }));
@@ -907,7 +1077,58 @@ function renderResult(){
     compare(); renderResult();
   }));
 }
-function refreshAll(){ renderFiles(); compare(); renderItems(); renderNear(); renderResult(); }
+/* ---------- 화면: 팀 배분 설정 ---------- */
+function recalc(){ compare(); renderAlloc(); renderResult(); }
+function renderAlloc(){
+  const box = $('#allocBox');
+  const res = state.res;
+  if(state.files.length<2 || !res){ box.innerHTML=''; return; }
+  const files = state.files, A = res.alloc;
+  box.innerHTML = `
+    <div class="fgrid">${files.map((f,fi)=>`
+      <label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 관할 열</span>${colSelect(f, f.centerCol, `data-fi="${fi}" data-k="centerCol"`, true)}</label>
+      <label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 등급 열</span>${colSelect(f, f.gradeCol, `data-fi="${fi}" data-k="gradeCol"`, true)}</label>`).join('')}
+    </div>
+    <div class="ctable${state.balance==='weight'?' w':''}">
+      <div class="cth"><span>관할센터</span><span>대상</span>${state.balance==='weight'?'<span>업무량</span>':''}<span>팀 이름 (쉼표로 구분)</span></div>
+      ${A.centers.map((c,ci)=>`<div class="ctr"><span><b>${esc(c.name)}</b>${c.raws.length?`<span class="meta"> · ${esc(c.raws.join(', '))} 포함</span>`:''}</span><span class="num">${c.count.toLocaleString()}</span>${state.balance==='weight'?`<span class="num">${c.w.toLocaleString()}</span>`:''}
+        <input type="text" class="teams" data-center="${esc(c.name)}" value="${esc(teamsOf(c.name).join(', '))}" aria-label="${esc(c.name)} 팀 이름"></div>`).join('')}
+    </div>
+    <div class="wrow">
+      <label class="f"><span>나누는 기준</span><select id="balance">
+        <option value="perlist" ${state.balance==='perlist'?'selected':''}>목록별 건수를 똑같이 (조사·훈련 등 각각, 함께 방문 건수도)</option>
+        <option value="count" ${state.balance==='count'?'selected':''}>대상 수만 똑같이 (지역이 가장 잘 모임)</option>
+        <option value="weight" ${state.balance==='weight'?'selected':''}>업무량 가중치로 (등급·업무 종류 반영)</option>
+      </select></label>
+    </div>
+    ${state.balance==='weight' ? `<div class="wrow">
+      <span class="meta"><b>업무량 가중치</b></span>
+      ${files.map((f,fi)=>`<label class="w" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)} <input type="number" step="0.1" min="0" data-fw="${fi}" value="${f.weight}"></label>`).join('')}
+      <label class="w">여러 목록 함께 방문 × <input type="number" step="0.05" min="0" max="2" id="wCombo" value="${state.combo}"></label>
+      ${GRADES.map(g=>`<label class="w">${g} × <input type="number" step="0.1" min="0" data-gw="${g}" value="${state.gradeW[g]}"></label>`).join('')}
+    </div>
+    <p class="meta" style="margin:0">예: 두 목록에 모두 있는 1급 대상 = (1 + 1) × 0.75 × 1.5 = 2.25. 목록 가중치를 0으로 두면 그 목록 업무는 업무량에 넣지 않습니다.</p>` : ''}
+    ${A.manual?`<div class="wrow"><button type="button" class="small" id="resetManual">손으로 바꾼 ${A.manual}곳 되돌리기</button></div>`:''}`;
+  box.querySelectorAll('select[data-k]').forEach(s=>s.addEventListener('change',e=>{ state.files[+s.dataset.fi][s.dataset.k] = +e.target.value; recalc(); }));
+  box.querySelectorAll('input.teams').forEach(i=>i.addEventListener('change',e=>{ state.teams[i.dataset.center] = e.target.value; recalc(); }));
+  box.querySelectorAll('[data-fw]').forEach(i=>i.addEventListener('change',e=>{ state.files[+i.dataset.fw].weight = Math.max(0, +e.target.value || 0); recalc(); }));
+  box.querySelectorAll('[data-gw]').forEach(i=>i.addEventListener('change',e=>{ state.gradeW[i.dataset.gw] = Math.max(0, +e.target.value || 0); recalc(); }));
+  const wc = $('#wCombo'); if(wc) wc.addEventListener('change',e=>{ state.combo = Math.max(0, +e.target.value || 0); recalc(); });
+  $('#balance').addEventListener('change',e=>{ state.balance = e.target.value; recalc(); });
+  const rm = $('#resetManual'); if(rm) rm.addEventListener('click',()=>{ state.allocOverride.clear(); recalc(); toast('손으로 바꾼 배정을 되돌렸습니다'); });
+}
+const centerShort = c => String(c).replace(/119안전센터$/,'').replace(/안전센터$/,'') || c;
+const teamFull = t => t.center==='전체' ? t.team : `${centerShort(t.center)} ${t.team}`;
+function allocOrdered(){
+  const res = state.res, cOrder = res.alloc.centers.map(c=>c.name);
+  return res.targets.slice().sort((x,y)=>{
+    const c = cOrder.indexOf(x.center)-cOrder.indexOf(y.center); if(c) return c;
+    const ts = teamsOf(x.center); const tt = ts.indexOf(x.team)-ts.indexOf(y.team); if(tt) return tt;
+    return (x.dong||'힣').localeCompare(y.dong||'힣','ko') || (x.pa?x.pa.road:'힣').localeCompare(y.pa?y.pa.road:'힣','ko') || ((x.pa?x.pa.num:1e9)-(y.pa?y.pa.num:1e9));
+  });
+}
+
+function refreshAll(){ renderFiles(); compare(); renderItems(); renderNear(); renderAlloc(); renderResult(); }
 
 /* ---------- 업로드 ---------- */
 let pickIdx = -1;
@@ -915,7 +1136,7 @@ function pick(idx){ pickIdx=idx; const inp=$('#fileInput'); inp.multiple = idx<0
 $('#fileInput').addEventListener('change',e=>{ if(e.target.files.length) handleFiles([...e.target.files], pickIdx); });
 function freeColor(){ for(let c=0;c<MAXF;c++) if(!state.files.some(f=>f.color===c)) return c; return 0; }
 function newFile(name, wb, label, sample){
-  const f = {id: ++fileSeq, name, wb, sel:null, partCfg:{}, partCache:{}, keys:[], addr:null, sample:!!sample,
+  const f = {id: ++fileSeq, name, wb, sel:null, partCfg:{}, partCache:{}, keys:[], addr:null, centerCol:null, gradeCol:null, weight:1, sample:!!sample,
     label: label || name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'').slice(0,20) || '파일', color: freeColor()};
   loadFile(f);
   return f;
@@ -1085,15 +1306,18 @@ function buildFieldCheck(){
   const rows = [[title,'','',''],['이름','주소','팀','비고']];
   let skipped = 0, gi = -1, last = null;
   const bands = [];
-  orderedTargets().forEach(([g,t])=>{
+  const nearById = {}; state.res.near.forEach(g=>nearById[g.id]=g);
+  const seq = state.mapTeam==='assign' ? allocOrdered().map(t=>[t.near?nearById[t.near]:null, t]) : orderedTargets();
+  seq.forEach(([g,t])=>{
     const name = t.name1 || t.name;
     if(!t.addr || !name){ skipped++; return; }
-    const team = state.mapTeam==='near' ? (g ? g.id : '단독') : '미배정';
+    const team = state.mapTeam==='assign' ? teamFull(t) : state.mapTeam==='near' ? (g ? g.id : '단독') : '미배정';
     const note = [t.n>1 ? `${t.n}개 목록(${placesText(t)})` : placesText(t)];
     if(g) note.push(`${g.id}(${g.where})`);
     note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}행`).join(' / '));
     rows.push([name, t.addr, team, note.join(' · ')]);
-    if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
+    if(state.mapTeam==='assign'){ const k=t.center+'|'+t.team; if(k!==last){ gi++; last=k; } bands.push(gi%2); }
+    else if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['A1'].s = {font:{bold:true,sz:12}};
@@ -1133,6 +1357,21 @@ function buildCombined(){
   wsS['!cols'] = [{wch:22},{wch:36},{wch:50},{wch:9},{wch:15},{wch:11},{wch:12},{wch:13}];
   XLSX.utils.book_append_sheet(wb, wsS, safeSheetName('요약', used));
 
+  // 1-2. 팀배분 요약
+  const isW = state.balance==='weight';
+  const ah = ['관할센터','팀','대상', ...files.map(f=>f.label), '함께 방문', ...files.map(f=>`${f.label}만`), ...(isW?['업무량','평균 대비']:[]), '특급','1급','2급','3급','기타','주요 동'];
+  const asum = [ah];
+  res.alloc.centers.forEach(c=>{ const avg = c.w/Math.max(1,c.teams.length);
+    c.teams.forEach(t=>asum.push([c.name, t.name, t.count, ...t.per, t.multi, ...t.only, ...(isW?[t.w, avg?`${Math.round((t.w-avg)/avg*100)}%`:'']:[]), ...t.grades, t.dongs]));
+    asum.push([`${c.name} 합계`,'',c.count, ...files.map((f,fi)=>c.teams.reduce((n,t)=>n+t.per[fi],0)), c.teams.reduce((n,t)=>n+t.multi,0)]); });
+  asum.push([]);
+  asum.push([isW ? '나누는 기준: 업무량 가중치 = (들어 있는 목록의 가중치 합) × (여러 목록이면 함께 방문 ' + state.combo + ') × 등급 가중치 (' + GRADES.map(g=>g+' '+state.gradeW[g]).join(', ') + ')' : '나누는 기준: 대상 수를 똑같이 (동·도로·번호 순으로 이어서 나눔, 팀 간 차이 최대 1곳)']);
+  asum.push(['손으로 바꾼 배정 ' + res.alloc.manual + '곳']);
+  const wsA = XLSX.utils.aoa_to_sheet(asum);
+  styleRow(wsA, 0, ah.length, HEAD_N);
+  wsA['!cols'] = autoCols(asum.slice(0, asum.length-3));
+  XLSX.utils.book_append_sheet(wb, wsA, safeSheetName('팀배분 요약', used));
+
   // 2. 대조표: 대상물마다 각 목록에 있는지 ○
   const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 위치`), '인근묶음','판정'];
   const mtx = [mh];
@@ -1171,16 +1410,30 @@ function buildCombined(){
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`${f.label}에만`, used));
   });
 
-  // 5. 배분용 전체대상
-  const ordered = orderedTargets();
-  const dist = [['인근묶음','묶음 범위','있는 목록','목록 수','대상물','주소', ...files.map(f=>`${f.label} 위치`),'배정 팀']];
-  ordered.forEach(([g,t])=>dist.push([g?g.id:'', g?g.where:'', placesText(t), t.n, t.name, t.addr, ...files.map((f,fi)=>refList(t.byFile[fi])), '']));
+  // 5. 배분용 전체대상: 관할센터 → 배정 팀 → 동·도로·번호 순, 같은 인근 묶음은 붙어 있음
+  const A = res.alloc, multiC = A.centers.length>1;
+  const ordered = allocOrdered();
+  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','등급', ...(state.balance==='weight'?['업무량']:[]),'인근묶음','묶음 범위', ...files.map(f=>`${f.label} 위치`)]];
+  const nearWhere = {}; res.near.forEach(g=>nearWhere[g.id]=g.where);
+  ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.grade, ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
   styleRow(wsX, 0, dist[0].length, HEAD_N);
   let gi = -1, last = null;
-  ordered.forEach(([g],i)=>{ if(!g) return; if(g!==last){ gi++; last=g; } styleRow(wsX, i+1, dist[0].length, BAND[gi%2]); });
+  ordered.forEach((t,i)=>{ const k = t.center+'|'+t.team; if(k!==last){ gi++; last=k; } styleRow(wsX, i+1, dist[0].length, BAND[gi%2]); });
   finishTable(wsX, dist);
   XLSX.utils.book_append_sheet(wb, wsX, safeSheetName('배분용 전체대상', used));
+
+  // 6. 팀별 시트: 팀마다 맡을 대상
+  A.centers.forEach(c=>teamsOf(c.name).forEach(team=>{
+    const mine = ordered.filter(t=>t.center===c.name && t.team===team);
+    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','등급', ...(isW?['업무량']:[]),'인근묶음', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
+    mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.grade, ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    styleRow(ws, 0, aoa[0].length, HEAD_N);
+    mine.forEach((t,i)=>{ if(t.n>1) styleRow(ws, i+1, 5, FILL); });
+    finishTable(ws, aoa);
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`배정 ${multiC?centerShort(c.name)+' ':''}${team}`, used));
+  }));
 
   // 6. 파일마다 원본 전체 + 표시
   files.forEach((f,fi)=>XLSX.utils.book_append_sheet(wb, f.multi ? mergedMarkSheet(fi) : markSheet(fi,0), safeSheetName(`${f.label} 전체`, used)));
