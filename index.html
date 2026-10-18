@@ -106,7 +106,11 @@ th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white
 th{position:sticky;top:0;background:var(--surface);font-weight:600;z-index:1}
 th.fcol{border-top:3px solid var(--fc)}
 td.num,th.num{font-family:var(--mono);color:var(--muted);text-align:right}
-td.mark{text-align:center}
+td.mark{text-align:left;white-space:normal;min-width:140px;max-width:240px;font-family:var(--sans)}
+th.fcol{white-space:normal;min-width:140px;max-width:240px}
+td.clip{overflow:hidden;text-overflow:ellipsis}
+td.clip.nm{max-width:240px}
+td.clip.ad{max-width:220px}
 tr.dup td{background:var(--dup-bg)}
 .pill{display:inline-block;font-size:14px;font-weight:600;padding:0 8px;border-radius:999px;background:var(--dup);color:var(--surface)}
 .pill.no{background:transparent;color:var(--muted);font-weight:400;padding:0}
@@ -129,6 +133,11 @@ td .meta{font-size:14px}
 .mapdl{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;justify-content:space-between}
 .mapdl > div:first-child{flex:1 1 280px;min-width:0}
 .hdrbox{display:flex;gap:6px;align-items:center}
+.sheetbox{display:grid;gap:6px}
+.schips{display:flex;flex-wrap:wrap;gap:5px}
+.schip{padding:3px 9px;font-size:14px;border-radius:6px;display:inline-flex;gap:6px;align-items:center;background:var(--bg);color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.schip span{font-family:var(--mono);font-size:12.5px;opacity:.75}
+.schip[aria-pressed="true"]{background:var(--a-soft);border-color:var(--fc,var(--accent));color:var(--fg);text-decoration:none;font-weight:600}
 .autochip{font-size:12.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--ok-soft);color:var(--ok);cursor:help}
 .sheetplan{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
 .sheetplan ol{margin:4px 0 0;padding-left:20px;display:grid;gap:2px}
@@ -158,6 +167,7 @@ td .meta{font-size:14px}
       <label><input type="checkbox" id="optSpace" checked> 띄어쓰기 무시</label>
       <label><input type="checkbox" id="optCase" checked> 영문 대소문자 무시</label>
       <label><input type="checkbox" id="optPunct"> 기호 무시 ( - . , ( ) 등 )</label>
+      <label title="같은 이름의 다른 건물(예: 어반팰리스 독산로 329 / 두산로 5-8)을 따로 봅니다. 한쪽에 주소가 없으면 이름만으로 맞춥니다."><input type="checkbox" id="optAddrSplit" checked> 이름이 같아도 주소가 다르면 다른 대상</label>
       <label>오타 의심 후보 찾기
         <select id="optFuzzy">
           <option value="-1">찾지 않음</option>
@@ -325,49 +335,92 @@ function isSubHeader(aoa, merges, h){
   const vals = sub.map(v=>String(v??'').trim()).filter(Boolean);
   return vals.length>0 && vals.every(v=>cellKind(v)==='text' && v.length<=15);
 }
-function loadSheet(f){
-  const ws = f.wb.Sheets[f.sheet];
+/* 시트 한 장 읽기 → part {sheet, si, short, headers, rows:[{excelRow, cells}], headerRow, ...} */
+const shortSheet = n => {
+  const s = String(n).replace(/^\s*\([^)]*\)\s*/,'').replace(/\s*\(\s*[\d,]+\s*개소\s*\)\s*$/,'').trim();
+  return s || String(n).trim();
+};
+function loadPart(f, sheet){
+  const cfg = f.partCfg[sheet] || {};
+  const ws = f.wb.Sheets[sheet];
+  const p = {sheet, si: f.wb.SheetNames.indexOf(sheet), short: shortSheet(sheet), hdrAuto: cfg.hdrAuto!==false, headerRow: cfg.headerRow||1, headers:[], rows:[], width:0, colOffset:0, startRow:0, hdrTwo:false, mergeFilled:0};
+  if(!ws || !ws['!ref']) return p;
   const aoa = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:true});
-  const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : {s:{r:0,c:0}};
+  const range = XLSX.utils.decode_range(ws['!ref']);
   const merges = sheetMerges(ws, range);
-  f.startRow = range.s.r;
-  if(f.hdrAuto !== false){
-    const d = detectHeader(aoa);
-    f.headerRow = f.startRow + d.idx + 1;
-    f.hdrAuto = true; f.hdrWhy = d.why;
-  }
-  const h = Math.max(0, Math.max(1, f.headerRow) - 1 - f.startRow);
+  p.startRow = range.s.r; p.colOffset = range.s.c;
+  if(p.hdrAuto){ const d = detectHeader(aoa); p.headerRow = p.startRow + d.idx + 1; p.hdrWhy = d.why; }
+  const h = Math.max(0, Math.max(1, p.headerRow) - 1 - p.startRow);
+  // 실제로 값이 있는 마지막 열까지만 쓴다 (서식만 넓게 잡힌 시트 대비)
   let width = 0;
-  aoa.forEach(r => { if(r.length>width) width=r.length; });
-  merges.forEach(m => { if(m.c2+1>width) width=m.c2+1; });
+  aoa.forEach(r => { for(let c=r.length-1;c>=width;c--){ if(String(r[c]??'').trim()!==''){ width=c+1; break; } } });
   const two = isSubHeader(aoa, merges, h);
-  f.hdrTwo = two;
-  f.headers = Array.from({length:width},(_,c)=>{
+  p.hdrTwo = two;
+  const heads = Array.from({length:width},(_,c)=>{
     const top = mergedValue(aoa, merges, h, c);
     const sub = two ? mergedValue(aoa, merges, h+1, c) : '';
     const name = !sub || sub===top ? top : (!top ? sub : top+' '+sub);
-    return name || XLSX.utils.encode_col(c + range.s.c)+'열';
+    return (name || XLSX.utils.encode_col(c + range.s.c)+'열').replace(/\s*\n\s*/g,' ').replace(/\s{2,}/g,' ');
   });
   const seen = {};
-  f.headers = f.headers.map(n=>{ seen[n]=(seen[n]||0)+1; return seen[n]>1 ? `${n} (${seen[n]})` : n; });
-  f.colOffset = range.s.c;
+  p.headers = heads.map(n=>{ seen[n]=(seen[n]||0)+1; return seen[n]>1 ? `${n} (${seen[n]})` : n; });
+  p.width = width;
   const dataStart = h + (two?2:1);
   const vmerges = merges.filter(m=>m.r2>m.r1 && m.r1>=dataStart);
-  f.mergeFilled = 0;
-  f.rows = [];
   for(let i=dataStart;i<aoa.length;i++){
     const r = aoa[i] || [];
-    const cells = f.headers.map((_,c)=>{
+    const cells = p.headers.map((_,c)=>{
       const v = r[c] ?? '';
       if(String(v).trim()!=='') return v;
       const m = vmerges.find(m=>i>m.r1 && i<=m.r2 && c>=m.c1 && c<=m.c2);
-      if(m){ f.mergeFilled++; return (aoa[m.r1]||[])[m.c1] ?? ''; }
+      if(m){ p.mergeFilled++; return (aoa[m.r1]||[])[m.c1] ?? ''; }
       return v;
     });
     if(cells.every(v => String(v).trim()==='')) continue;
-    f.rows.push({excelRow: f.startRow + i + 1, cells});
+    p.rows.push({excelRow: p.startRow + i + 1, cells});
   }
-  if(two) f.hdrWhy = (f.hdrWhy ? f.hdrWhy+' · ' : '') + '2줄 머리글 합침';
+  if(two) p.hdrWhy = (p.hdrWhy ? p.hdrWhy+' · ' : '') + '2줄 머리글 합침';
+  return p;
+}
+function getPart(f, sheet){
+  if(!f.partCache[sheet]) f.partCache[sheet] = loadPart(f, sheet);
+  return f.partCache[sheet];
+}
+/* 여러 시트를 합칠 때 열 이름 맞추기: 띄어쓰기·줄바꿈을 지우고, 이름 열은 '대상물명'으로 모은다 */
+function canonHeader(h){
+  const c = String(h).replace(/\s+/g,'');
+  if(!/대표동/.test(c) && (/학교명/.test(c) || /(대상물명|건물명|시설명|업체명|업소명)$/.test(c) || c==='상호')) return '대상물명';
+  if(c==='관할') return '관할센터';
+  return c;
+}
+function defaultSheets(f){
+  const names = f.wb.SheetNames.filter(n=>!/참고/.test(n) && getPart(f,n).rows.length>0);
+  return names.length ? names : [f.wb.SheetNames.find(n=>getPart(f,n).rows.length>0) || f.wb.SheetNames[0]];
+}
+/* 고른 시트들을 한 목록으로 합친다. 시트가 하나면 예전과 같은 모양 */
+function loadFile(f){
+  if(!f.sel || !f.sel.length) f.sel = defaultSheets(f);
+  f.parts = f.sel.map(n=>getPart(f,n));
+  f.multi = f.parts.length > 1;
+  const idx = new Map();
+  f.headers = [];
+  f.parts.forEach(p=>{
+    const used = new Set();
+    p.map = p.headers.map(h=>{
+      let c = f.multi ? canonHeader(h) : h;
+      if(used.has(c)) c = h;            // 한 시트 안에서 같은 이름으로 모이면 원래 이름 유지
+      used.add(c);
+      if(!idx.has(c)){ idx.set(c, f.headers.length); f.headers.push(f.multi && c==='대상물명' ? '대상물명' : h); }
+      return idx.get(c);
+    });
+  });
+  const H = f.headers.length;
+  f.rows = [];
+  f.parts.forEach((p,pi)=>p.rows.forEach(r=>{
+    const cells = new Array(H).fill('');
+    r.cells.forEach((v,c)=>{ if(String(v).trim()!=='' || cells[p.map[c]]==='') cells[p.map[c]] = v; });
+    f.rows.push({excelRow:r.excelRow, part:pi, si:p.si, cells, ref: f.multi ? `${p.short} ${r.excelRow}` : String(r.excelRow)});
+  }));
   f.keys = []; f.addr = null;   // 열 선택은 다시 추측
 }
 
@@ -413,12 +466,14 @@ function ensureCols(){
     }
     f.keys.length = state.nItems;
     if(f.addr==null || f.addr>=f.headers.length) f.addr = guessAddr(f);
+    const isAddr = h => /주소|소재지/.test(norm(h));
+    f.addrAlt = f.headers.map((h,i)=>i).filter(i=>i!==f.addr && isAddr(f.headers[i])).sort((x,y)=>(/도로명/.test(f.headers[y])-/도로명/.test(f.headers[x])));
   });
 }
 
 /* ---------- 비교 ---------- */
 let OPT = {space:true, lower:true, punct:false};
-function readOpts(){ OPT = {space:$('#optSpace').checked, lower:$('#optCase').checked, punct:$('#optPunct').checked}; }
+function readOpts(){ OPT = {space:$('#optSpace').checked, lower:$('#optCase').checked, punct:$('#optPunct').checked, addrSplit:$('#optAddrSplit').checked}; }
 function normalize(v){
   let s = String(v ?? '').trim();
   if(OPT.space) s = s.replace(/\s+/g,'');
@@ -545,8 +600,8 @@ function findCands(){
   out.forEach(c=>{
     const pct = Math.round(c.sim*100);
     const fa = state.files[c.a.fi], fb = state.files[c.b.fi];
-    c.a.candTxt += (c.a.candTxt?', ':'') + `${fb.label} ${c.b.excelRow}행(${pct}%)`;
-    c.b.candTxt += (c.b.candTxt?', ':'') + `${fa.label} ${c.a.excelRow}행(${pct}%)`;
+    c.a.candTxt += (c.a.candTxt?', ':'') + `${fb.label} ${c.b.ref}행(${pct}%)`;
+    c.b.candTxt += (c.b.candTxt?', ':'') + `${fa.label} ${c.a.ref}행(${pct}%)`;
   });
   return out;
 }
@@ -566,30 +621,49 @@ function compare(){
   const union = (x,y) => { const a=find(x), b=find(y); if(a!==b) parent.set(a,b); };
   const all = [];
   files.forEach((f,fi)=>f.rows.forEach(r=>{
-    r.fi = fi; r.rid = f.id+':'+r.excelRow;
+    r.fi = fi; r.rid = f.id+':'+r.si+':'+r.excelRow;
     r.key = keyOf(r.cells, f.keys);
-    r.addrTxt = f.addr>=0 ? String(r.cells[f.addr] ?? '').trim() : '';
-    r.pa = parseAddr(r.addrTxt); r.candTxt = '';
+    // 주소: 고른 주소 열이 비어 있으면 다른 주소 열(시트마다 열이 다를 때)에서 찾는다
+    r.addrTxt = '';
+    if(f.addr>=0){ for(const c of [f.addr, ...f.addrAlt]){ const v = String(r.cells[c] ?? '').trim(); if(v){ r.addrTxt = v; break; } } }
+    r.pa = parseAddr(r.addrTxt); r.candTxt = ''; r.addrAmbig = false;
     parent.set(r.rid, r.rid); all.push(r);
   }));
-  const firstByKey = new Map();
-  all.forEach(r=>{ if(r.key===null) return; if(firstByKey.has(r.key)) union(r.rid, firstByKey.get(r.key)); else firstByKey.set(r.key, r.rid); });
+  files.forEach(f=>{ f.blank = f.rows.filter(r=>r.key===null).length; });
+  // 기준값이 같은 행끼리 잇는다. 옵션이 켜져 있으면 주소 번호(도로+번호)가 서로 다른 행은 따로 둔다.
+  // 주소가 없는 행은 그 이름의 가장 큰 주소 묶음에 붙인다.
+  const byKey = new Map();
+  all.forEach(r=>{ if(r.key===null) return; let l=byKey.get(r.key); if(!l) byKey.set(r.key, l=[]); l.push(r); });
+  let splitNames = 0;
+  byKey.forEach(list=>{
+    const ak = r => r.pa ? r.pa.kind+'|'+r.pa.road+'|'+r.pa.num : null;
+    const groups = new Map();
+    if(OPT.addrSplit) list.forEach(r=>{ const k=ak(r); if(k){ let g=groups.get(k); if(!g) groups.set(k, g=[]); g.push(r); } });
+    if(groups.size<=1){ list.forEach(r=>union(r.rid, list[0].rid)); return; }
+    splitNames++;
+    let big = null;
+    groups.forEach(g=>{ g.forEach(r=>union(r.rid, g[0].rid)); if(!big || g.length>big.length) big = g; });
+    list.forEach(r=>{ if(!ak(r)){ union(r.rid, big[0].rid); r.addrAmbig = true; } });
+  });
   const manual = new Set();
   state.aliases.forEach(([x,y])=>{ if(parent.has(x) && parent.has(y)){ union(x,y); manual.add(x); manual.add(y); } });
   const comp = new Map();
-  all.forEach(r=>{ const k=find(r.rid); if(!comp.has(k)) comp.set(k,[]); comp.get(k).push(r); });
+  // 기준 칸이 빈 행(소계·안내 줄 등)은 대상물로 세지 않는다
+  all.forEach(r=>{ if(r.key===null){ r.target = {blank:true, n:0, rows:[r], byFile:files.map(()=>[]), inFiles:[]}; r.near=null; return; } const k=find(r.rid); if(!comp.has(k)) comp.set(k,[]); comp.get(k).push(r); });
   const targets = [...comp.values()].map(rows=>{
     const byFile = files.map(()=>[]);
     rows.forEach(r=>byFile[r.fi].push(r));
     const inFiles = byFile.map((a,i)=>a.length?i:-1).filter(i=>i>=0);
     const first = byFile[inFiles[0]][0], ff = files[first.fi];
     const t = {rows, byFile, inFiles, n: inFiles.length,
-      inner: byFile.some(a=>a.length>1),
+      inner: byFile.some(a=>a.length>1 && new Set(a.map(r=>r.si)).size < a.length),
+      multiSheet: byFile.some(a=>new Set(a.map(r=>r.si)).size>1),
       manual: rows.some(r=>manual.has(r.rid)),
+      addrAmbig: rows.some(r=>r.addrAmbig),
       name: ff.keys.map(i=>first.cells[i]).join(' / '),
       name1: String(first.cells[ff.keys[0]] ?? '').trim(),
       addr: (rows.find(r=>r.addrTxt)||{}).addrTxt || '',
-      order: first.fi*1e7 + first.excelRow};
+      order: first.fi*1e9 + first.si*1e6 + first.excelRow};
     rows.forEach(r=>r.target=t);
     return t;
   }).sort((x,y)=>x.order-y.order);
@@ -599,14 +673,17 @@ function compare(){
     dup: f.rows.filter(r=>r.target.n>1).length,
     only: f.rows.filter(r=>r.target.n===1).length,
     onlyT: targets.filter(t=>t.n===1 && t.inFiles[0]===fi).length,
-    inner: f.rows.filter(r=>r.target.byFile[fi].length>1).length
+    inner: f.rows.filter(r=>!r.target.blank && r.target.inner && r.target.byFile[fi].filter(x=>x.si===r.si).length>1).length,
+    blank: f.blank
   }));
   state.res = {targets, near, cands, perFile,
     multi: targets.filter(t=>t.n>1).length,
     every: targets.filter(t=>t.n===files.length).length,
     innerT: targets.filter(t=>t.inner).length,
     manualT: targets.filter(t=>t.manual && t.n>1).length,
-    unparsed: targets.filter(t=>t.addr && !t.pa).length};
+    unparsed: targets.filter(t=>t.addr && !t.pa).length,
+    blank: files.reduce((n,f)=>n+f.blank,0),
+    splitNames, ambigT: targets.filter(t=>t.addrAmbig).length};
 }
 
 /* ---------- 화면: 파일 ---------- */
@@ -618,10 +695,11 @@ function renderFiles(){
         <button type="button" class="ghost small" data-remove="${fi}" aria-label="${esc(f.label)} 빼기">빼기</button></div>
       <div class="row">
         <label class="f">부서/구분 이름<input type="text" id="lbl${f.id}" maxlength="20" value="${esc(f.label)}"></label>
-        <label class="f">시트<select id="sheet${f.id}">${f.wb.SheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
-        <label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${f.id}" value="${f.headerRow}">${f.hdrAuto?`<span class="autochip" title="${esc(f.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost small" id="hdrAuto${f.id}">자동으로</button>`}</span></label>
+        ${!f.multi ? (()=>{ const p=f.parts[0]; return `<label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${f.id}" value="${p.headerRow}">${p.hdrAuto?`<span class="autochip" title="${esc(p.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost small" id="hdrAuto${f.id}">자동으로</button>`}</span></label>`; })() : ''}
       </div>
-      <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.hdrTwo?' · 2줄 머리글':''}${f.mergeFilled?` · 병합 칸 ${f.mergeFilled}개 채움`:''}</span>
+      ${f.wb.SheetNames.length>1 ? `<div class="sheetbox"><div class="meta">시트 <b>${f.sel.length}</b>/${f.wb.SheetNames.length}개 사용 · 고른 시트를 합쳐 한 목록으로 비교합니다</div>
+        <div class="schips">${f.wb.SheetNames.map((n,si)=>{ const on=f.sel.includes(n), cnt=getPart(f,n).rows.length; return `<button type="button" class="schip" aria-pressed="${on}" data-sheet="${si}" title="${esc(n)}${cnt?'':' (읽을 행 없음)'}">${esc(shortSheet(n))}<span>${cnt.toLocaleString()}</span></button>`; }).join('')}</div></div>` : ''}
+      <span class="meta">${f.rows.length.toLocaleString()}개 행 · 열 ${f.headers.length}개${f.multi?' · 머리글 행은 시트마다 자동':''}${f.parts.some(p=>p.hdrTwo)?' · 2줄 머리글':''}${f.parts.reduce((n,p)=>n+p.mergeFilled,0)?` · 병합 칸 ${f.parts.reduce((n,p)=>n+p.mergeFilled,0)}개 채움`:''}</span>
     </div>`).join('') + (state.files.length<MAXF ? `<div class="panel add${state.files.length?'':' only'}">
       <div class="drop" tabindex="0" role="button" id="dropAdd">${state.files.length<2?'비교할 파일을':'파일을 더'} 끌어다 놓거나 <strong>눌러서 선택</strong><div class="meta">엑셀(.xlsx, .xls) 또는 CSV · 여러 개를 한 번에 올려도 됩니다</div></div>
       ${state.files.length===0?`<div class="row samplerow"><button type="button" id="trySample">예시로 둘러보기</button><span class="meta">가상 목록 3개로 결과 화면을 먼저 볼 수 있습니다.</span></div>`:''}
@@ -644,10 +722,23 @@ function renderFiles(){
   }));
   state.files.forEach(f=>{
     $('#lbl'+f.id).addEventListener('change',e=>{ f.label = e.target.value.trim() || ('파일 '+letter(f)); e.target.value=f.label; renderItems(); renderNear(); compare(); renderResult(); });
-    const reload = () => { dropDecisions(f.id); loadSheet(f); refreshAll(); };
-    $('#sheet'+f.id).addEventListener('change',e=>{ f.sheet=e.target.value; f.hdrAuto=true; reload(); });
-    $('#hdr'+f.id).addEventListener('change',e=>{ f.headerRow=Math.max(1,parseInt(e.target.value)||1); f.hdrAuto=false; reload(); });
-    const ab = $('#hdrAuto'+f.id); if(ab) ab.addEventListener('click',()=>{ f.hdrAuto=true; reload(); });
+    // 시트를 바꿔도 고른 열은 이름이 같으면 그대로 둔다
+    const reload = () => {
+      const keyNames = f.keys.map(i=>f.headers[i]), addrName = f.addr>=0 ? f.headers[f.addr] : null, addrOff = f.addr===-1;
+      loadFile(f);
+      f.keys = keyNames.map(n=>{ const i=f.headers.indexOf(n); return i>=0 ? i : null; });
+      f.addr = addrOff ? -1 : (addrName && f.headers.indexOf(addrName)>=0 ? f.headers.indexOf(addrName) : null);
+      refreshAll();
+    };
+    document.querySelectorAll(`[data-fi="${state.files.indexOf(f)}"] .schip`).forEach(b=>b.addEventListener('click',()=>{
+      const n = f.wb.SheetNames[+b.dataset.sheet];
+      if(f.sel.includes(n)){ if(f.sel.length===1){ toast('시트는 하나 이상 골라야 합니다'); return; } f.sel = f.sel.filter(x=>x!==n); }
+      else{ if(!getPart(f,n).rows.length){ toast('이 시트에는 읽을 표가 없습니다'); return; } f.sel = f.wb.SheetNames.filter(x=>x===n || f.sel.includes(x)); }
+      reload();
+    }));
+    const hdr = $('#hdr'+f.id);
+    if(hdr) hdr.addEventListener('change',e=>{ const n=f.sel[0]; f.partCfg[n]={headerRow:Math.max(1,parseInt(e.target.value)||1), hdrAuto:false}; delete f.partCache[n]; reload(); });
+    const ab = $('#hdrAuto'+f.id); if(ab) ab.addEventListener('click',()=>{ const n=f.sel[0]; f.partCfg[n]={hdrAuto:true}; delete f.partCache[n]; reload(); });
   });
 }
 function colSelect(f, val, attrs, withNone){
@@ -676,7 +767,7 @@ function renderNear(){
 }
 
 /* ---------- 화면: 결과 ---------- */
-function refList(rows){ return rows.map(r=>r.excelRow).join(','); }
+function refList(rows){ return rows.map(r=>r.ref).join(', '); }
 function refsHtml(t, skipFi){
   return t.inFiles.filter(fi=>fi!==skipFi).map(fi=>{ const f=state.files[fi]; return `<span style="${fc(f)}">${letter(f)}${refList(t.byFile[fi])}</span>`; }).join(' ');
 }
@@ -707,6 +798,8 @@ function renderResult(){
   <div class="summary">${files.map((f,fi)=>`<div class="stat" style="${fc(f)}"><div class="k">${esc(f.label)}에만 있음</div><div class="v">${res.perFile[fi].onlyT.toLocaleString()} <span class="meta">/ ${f.rows.length.toLocaleString()}행</span></div></div>`).join('')}</div>
   ${res.cands.length?`<div class="hint">철자가 비슷해서 같은 대상일 수 있는 후보가 <b>${res.cands.length}쌍</b> 있습니다. <button type="button" class="linkbtn" data-tab="fuzzy">비슷한 후보 확인하기</button></div>`:''}
   ${res.innerT?`<div class="hint">한 파일 안에 같은 대상이 두 번 이상 들어 있는 경우가 <b>${res.innerT}건</b> 있습니다. <button type="button" class="linkbtn" data-tab="matrix" data-setfilter="inner">확인하기</button></div>`:''}
+  ${res.splitNames?`<div class="meta">이름은 같지만 주소가 달라 서로 다른 대상으로 본 이름이 ${res.splitNames}개 있습니다${res.ambigT?` (주소가 없어 어느 건물인지 모르는 행이 붙은 대상 ${res.ambigT}곳은 판정 칸에 "주소 확인" 표시)`:''}.</div>`:''}
+  ${res.blank?`<div class="meta">비교 기준 칸이 빈 행 ${res.blank}개(소계·안내 줄 등)는 대상물로 세지 않았습니다. 파일별 탭의 "기준값 없는 행"에서 볼 수 있습니다.</div>`:''}
   ${res.unparsed?`<div class="meta">주소를 읽지 못한 대상 ${res.unparsed}곳은 묶음에서 빠집니다. "○○로 123" 같은 도로명주소나 "○○동 123" 같은 지번주소 형식이어야 합니다.</div>`:''}
   <div class="sheetplan">
     <div class="meta">통합 결과 파일의 시트 구성</div>
@@ -755,16 +848,16 @@ function renderResult(){
     if(!list.length) html += '<div class="empty">해당하는 대상물이 없습니다.</div>';
     else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th>
         ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</th>`).join('')}<th>인근묶음</th><th>판정</th></tr></thead><tbody>
-      ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td>${esc(t.name)}</td><td>${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td>
+      ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td>
         ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?`<span>○ ${refList(t.byFile[fi])}</span>`:'<span class="meta">–</span>'}</td>`).join('')}
         <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
-        <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}</td></tr>`).join('')}
+        <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}${t.addrAmbig?' <span class="pill inner">주소 확인</span>':''}</td></tr>`).join('')}
       </tbody></table></div>`;
   }else if(state.tab==='fuzzy'){
     if(state.fuzzy<0) html += '<div class="empty">오타 의심 후보 찾기가 꺼져 있습니다. 비교 기준의 옵션에서 켤 수 있습니다.</div>';
     else if(!res.cands.length) html += '<div class="empty">철자가 비슷한 후보가 없습니다.</div>';
     else{
-      const cell = r => { const f=files[r.fi]; return `<td style="${fc(f)}"><span class="tag">${letter(f)}</span> ${esc(f.keys.map(i=>r.cells[i]).join(' / '))}<div class="meta">${esc(f.label)} ${r.excelRow}행${r.addrTxt?' · '+esc(r.addrTxt):''}</div></td>`; };
+      const cell = r => { const f=files[r.fi]; return `<td style="${fc(f)}"><span class="tag">${letter(f)}</span> ${esc(f.keys.map(i=>r.cells[i]).join(' / '))}<div class="meta">${esc(f.label)} ${esc(r.ref)}행${r.addrTxt?' · '+esc(r.addrTxt):''}</div></td>`; };
       html += `<div class="toolbar"><span class="meta">글자를 자음·모음 단위로 쪼개 비교한 유사도입니다. 주소까지 같으면 같은 대상일 가능성이 높습니다.</span>
           <button type="button" data-allok>보이는 후보 모두 같은 대상으로</button></div>
         <div class="tbl"><table><thead><tr><th class="num">유사도</th><th>목록 1</th><th>목록 2</th><th>주소</th><th>판정</th></tr></thead><tbody>
@@ -777,18 +870,21 @@ function renderResult(){
     if(state.span<0) html += '<div class="empty">묶음 범위가 "묶지 않음"으로 되어 있습니다.</div>';
     else if(!res.near.length) html += '<div class="empty">가까운 주소끼리 묶인 대상이 없습니다. 주소 열과 묶음 범위를 확인해 보세요.</div>';
     else html += `<div class="tbl"><table><thead><tr><th>묶음</th><th>위치</th><th>있는 목록</th><th>대상물</th><th>주소</th><th>원본 행</th></tr></thead><tbody>
-      ${res.near.map((g,gi)=>g.members.map((t,i)=>`<tr class="${gi%2?'grp2':'grp1'}">${i===0?`<td rowspan="${g.members.length}"><b>${g.id}</b></td><td rowspan="${g.members.length}">${esc(g.where)}</td>`:''}<td>${placesHtml(t)}</td><td>${esc(t.name)}</td><td>${esc(t.addr)}</td><td class="refs">${refsHtml(t,-1)}</td></tr>`).join('')).join('')}
+      ${res.near.map((g,gi)=>g.members.map((t,i)=>`<tr class="${gi%2?'grp2':'grp1'}">${i===0?`<td rowspan="${g.members.length}"><b>${g.id}</b></td><td rowspan="${g.members.length}">${esc(g.where)}</td>`:''}<td>${placesHtml(t)}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="refs">${refsHtml(t,-1)}</td></tr>`).join('')).join('')}
       </tbody></table></div>`;
   }else{
     const fi = files.findIndex(f=>'f'+f.id===state.tab), f = files[fi];
     let rows = f.rows;
     if(state.ffilter==='dup') rows = rows.filter(r=>r.target.n>1);
     if(state.ffilter==='no') rows = rows.filter(r=>r.target.n===1);
+    if(state.ffilter==='blank') rows = rows.filter(r=>r.target.blank);
     html += `<div class="toolbar"><div class="chips">
-      ${[['all','전체'],['dup','다른 목록에도 있음'],['no',f.label+'에만']].map(([k,t])=>`<button aria-pressed="${state.ffilter===k}" data-ffilter="${k}" type="button">${esc(t)}</button>`).join('')}
+      ${[['all','전체'],['dup','다른 목록에도 있음'],['no',f.label+'에만'],...(f.blank?[['blank','기준값 없는 행']]:[])].map(([k,t])=>`<button aria-pressed="${state.ffilter===k}" data-ffilter="${k}" type="button">${esc(t)}</button>`).join('')}
       </div><span class="meta">${rows.length.toLocaleString()}개 행${rows.length>LIMIT?` · 앞의 ${LIMIT}개만 표시`:''}</span></div>
-      <div class="tbl"><table><thead><tr><th class="num">행</th><th>중복여부</th><th>다른 목록</th><th>인근묶음</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
-      ${rows.slice(0,LIMIT).map(r=>{ const t=r.target; return `<tr class="${t.n>1?'dup':''}"><td class="num">${r.excelRow}</td><td>${t.n>1?`<span class="pill">${t.n}개 목록</span>`:'<span class="pill no">–</span>'}${t.byFile[fi].length>1?' <span class="pill inner">파일 안 중복</span>':''}</td><td class="refs">${refsHtml(t,fi)}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`; }).join('')}
+      <div class="tbl"><table><thead><tr><th class="num">${f.multi?'시트·행':'행'}</th><th>중복여부</th><th>다른 목록</th><th>인근묶음</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.slice(0,LIMIT).map(r=>{ const t=r.target; if(t.blank) return `<tr><td class="num">${esc(r.ref)}</td><td><span class="pill no">기준값 없음</span></td><td></td><td></td>${r.cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`;
+        const sameSheet = t.byFile[fi].filter(x=>x.si===r.si).length>1, otherSheets = t.byFile[fi].filter(x=>x.si!==r.si);
+        return `<tr class="${t.n>1?'dup':''}"><td class="num">${esc(r.ref)}</td><td>${t.n>1?`<span class="pill">${t.n}개 목록</span>`:'<span class="pill no">–</span>'}${sameSheet?' <span class="pill inner">파일 안 중복</span>':''}</td><td class="refs">${refsHtml(t,fi)}${otherSheets.length?` <span class="meta">같은 파일: ${esc(refList(otherSheets))}</span>`:''}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td class="clip ad" title="${esc(c)}">${esc(c)}</td>`).join('')}</tr>`; }).join('')}
       </tbody></table></div>`;
   }
   html += `<p class="foot">원본 행 번호 앞의 글자(A, B, C…)는 파일 카드의 글자입니다. 표시본은 원본 오른쪽에 <b>중복여부</b>, <b>다른 목록 위치</b>, <b>인근묶음</b> 열이 붙고 중복 행은 노란색으로 칠해집니다. 원본의 셀 서식은 단순하게 바뀔 수 있으니 원본은 따로 보관하세요.</p>`;
@@ -819,9 +915,9 @@ function pick(idx){ pickIdx=idx; const inp=$('#fileInput'); inp.multiple = idx<0
 $('#fileInput').addEventListener('change',e=>{ if(e.target.files.length) handleFiles([...e.target.files], pickIdx); });
 function freeColor(){ for(let c=0;c<MAXF;c++) if(!state.files.some(f=>f.color===c)) return c; return 0; }
 function newFile(name, wb, label, sample){
-  const f = {id: ++fileSeq, name, wb, sheet: wb.SheetNames[0], headerRow:1, hdrAuto:true, keys:[], addr:null, sample:!!sample,
+  const f = {id: ++fileSeq, name, wb, sel:null, partCfg:{}, partCache:{}, keys:[], addr:null, sample:!!sample,
     label: label || name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'').slice(0,20) || '파일', color: freeColor()};
-  loadSheet(f);
+  loadFile(f);
   return f;
 }
 function updateSampleNote(){
@@ -899,26 +995,36 @@ function finishTable(ws, aoa){
 const otherText = (t, fi) => t.inFiles.filter(x=>x!==fi).map(x=>`${state.files[x].label} ${refList(t.byFile[x])}행`).join(' / ');
 const placesText = t => t.inFiles.map(x=>state.files[x].label).join(', ');
 
-/* 원본 시트 + 표시 */
-function markSheet(fi){
+/* 표시 내용: 중복여부 · 다른 목록 위치 (같은 파일의 다른 시트도 함께) */
+function markInfo(row, fi){
+  const t = row.target;
+  if(!t || t.blank) return null;
   const f = state.files[fi];
-  const ws = cloneSheet(f.wb.Sheets[f.sheet]);
+  const mine = t.byFile[fi].filter(x=>x!==row);
+  const sameSheet = mine.filter(x=>x.si===row.si), otherSheet = mine.filter(x=>x.si!==row.si);
+  if(t.n<2 && !mine.length) return null;
+  const label = t.n>1 ? `중복(${t.n}개 목록)` + (sameSheet.length?' · 파일 안 중복':'') : (sameSheet.length ? '파일 안 중복' : '같은 파일 다른 시트');
+  const where = [otherText(t,fi), mine.length ? `같은 파일 ${refList(mine)}행` : ''].filter(Boolean).join(' / ');
+  return {label, where, dup: t.n>1};
+}
+/* 원본 시트 한 장 + 표시 */
+function markSheet(fi, pi){
+  const f = state.files[fi], p = f.parts[pi];
+  const ws = cloneSheet(f.wb.Sheets[p.sheet]);
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  const c1 = f.colOffset + f.headers.length, c2 = c1 + 1, c3 = c1 + 2;
-  const hr = f.headerRow - 1;
+  const c1 = p.colOffset + p.width, c2 = c1 + 1, c3 = c1 + 2;
+  const hr = p.headerRow - 1;
   ws[enc({r:hr,c:c1})] = {t:'s',v:'중복여부',s:HEAD};
   ws[enc({r:hr,c:c2})] = {t:'s',v:'다른 목록 위치',s:HEAD};
   ws[enc({r:hr,c:c3})] = {t:'s',v:'인근묶음',s:{...NEAR}};
-  f.rows.forEach(row=>{
-    const r = row.excelRow - 1, t = row.target;
+  f.rows.filter(r=>r.part===pi).forEach(row=>{
+    const r = row.excelRow - 1;
     if(row.near) ws[enc({r,c:c3})] = {t:'s',v:row.near,s:NEAR};
-    const inner = t.byFile[fi].length>1;
-    if(t.n<2 && !inner) return;
-    const label = t.n>1 ? `중복(${t.n}개 목록)` + (inner?' · 파일 안 중복':'') : '파일 안 중복';
-    const where = [otherText(t,fi), inner ? `같은 파일 ${t.byFile[fi].filter(x=>x!==row).map(x=>x.excelRow).join(',')}행` : ''].filter(Boolean).join(' / ');
-    ws[enc({r,c:c1})] = {t:'s',v:label,s:{...FILL,font:{bold:true,color:{rgb:'9A5B00'}}}};
-    ws[enc({r,c:c2})] = {t:'s',v:where,s:FILL};
-    if(t.n>1) for(let c=range.s.c;c<c1;c++){
+    const m = markInfo(row, fi);
+    if(!m) return;
+    ws[enc({r,c:c1})] = {t:'s',v:m.label,s:{...FILL,font:{bold:true,color:{rgb:'9A5B00'}}}};
+    ws[enc({r,c:c2})] = {t:'s',v:m.where,s:FILL};
+    if(m.dup) for(let c=range.s.c;c<c1;c++){
       const a = enc({r,c});
       if(!ws[a]) ws[a] = {t:'s',v:''};
       ws[a].s = Object.assign({}, ws[a].s||{}, FILL);
@@ -928,14 +1034,30 @@ function markSheet(fi){
   range.e.r = Math.max(range.e.r, hr);
   ws['!ref'] = XLSX.utils.encode_range(range);
   const cols = ws['!cols'] ? ws['!cols'].slice() : [];
-  cols[c1] = {wch:16}; cols[c2] = {wch:24}; cols[c3] = {wch:10};
+  cols[c1] = {wch:16}; cols[c2] = {wch:28}; cols[c3] = {wch:10};
   ws['!cols'] = cols;
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:hr,c:range.s.c},e:{r:range.e.r,c:c3}})};
   return ws;
 }
+/* 여러 시트를 합친 파일: 통합 결과에는 합친 표 한 장으로 넣는다 */
+function mergedMarkSheet(fi){
+  const f = state.files[fi];
+  const aoa = [['시트','원본 행','중복여부','다른 목록 위치','인근묶음', ...f.headers]];
+  const marks = [];
+  f.rows.forEach(row=>{
+    const m = markInfo(row, fi);
+    marks.push(m);
+    aoa.push([f.parts[row.part].short, row.excelRow, m?m.label:'', m?m.where:'', row.near||'', ...row.cells]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  styleRow(ws, 0, aoa[0].length, headOf(f));
+  marks.forEach((m,i)=>{ if(m && m.dup) styleRow(ws, i+1, aoa[0].length, FILL); else if(m) styleRow(ws, i+1, 4, FILL); });
+  finishTable(ws, aoa);
+  return ws;
+}
 function buildMarked(fi){
   const f = state.files[fi], out = XLSX.utils.book_new();
-  f.wb.SheetNames.forEach(n=>XLSX.utils.book_append_sheet(out, n===f.sheet ? markSheet(fi) : cloneSheet(f.wb.Sheets[n]), n));
+  f.wb.SheetNames.forEach(n=>{ const pi = f.sel.indexOf(n); XLSX.utils.book_append_sheet(out, pi>=0 ? markSheet(fi, pi) : cloneSheet(f.wb.Sheets[n]), n); });
   return out;
 }
 function orderedTargets(){
@@ -990,8 +1112,8 @@ function buildCombined(){
   const opts = [$('#optSpace').checked&&'띄어쓰기 무시',$('#optCase').checked&&'대소문자 무시',$('#optPunct').checked&&'기호 무시'].filter(Boolean).join(', ') || '없음';
 
   // 1. 요약
-  const sum = [['구분','파일명','전체 행','다른 목록과 중복','이 목록에만','파일 안 중복']];
-  files.forEach((f,fi)=>sum.push([f.label, f.name, f.rows.length, res.perFile[fi].dup, res.perFile[fi].only, res.perFile[fi].inner]));
+  const sum = [['구분','파일명','사용 시트','전체 행','다른 목록과 중복','이 목록에만','파일 안 중복','기준값 없는 행']];
+  files.forEach((f,fi)=>sum.push([f.label, f.name, f.parts.map(p=>`${p.short}(${p.rows.length})`).join(', '), f.rows.length, res.perFile[fi].dup, res.perFile[fi].only, res.perFile[fi].inner, res.perFile[fi].blank]));
   sum.push([]);
   const info = [
     ['전체 대상물(중복 합침)', res.targets.length],
@@ -1005,18 +1127,18 @@ function buildCombined(){
   const infoStart = sum.length;
   info.forEach(r=>sum.push(r));
   const wsS = XLSX.utils.aoa_to_sheet(sum);
-  styleRow(wsS, 0, 6, HEAD_N);
+  styleRow(wsS, 0, 8, HEAD_N);
   files.forEach((f,fi)=>{ const a=enc({r:fi+1,c:0}); wsS[a].s = {font:{bold:true,color:{rgb:XL_COLORS[f.color]}}}; });
   info.forEach((_,i)=>{ const a=enc({r:infoStart+i,c:0}); if(wsS[a]) wsS[a].s = {font:{bold:true}}; });
-  wsS['!cols'] = [{wch:22},{wch:40},{wch:9},{wch:15},{wch:11},{wch:12}];
+  wsS['!cols'] = [{wch:22},{wch:36},{wch:50},{wch:9},{wch:15},{wch:11},{wch:12},{wch:13}];
   XLSX.utils.book_append_sheet(wb, wsS, safeSheetName('요약', used));
 
   // 2. 대조표: 대상물마다 각 목록에 있는지 ○
-  const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 행`), '인근묶음','판정'];
+  const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 위치`), '인근묶음','판정'];
   const mtx = [mh];
   const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(x.order-y.order));
   sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])), t.near||'',
-    [t.manual?'직접 확정':'', t.inner?'파일 안 중복':''].filter(Boolean).join(', ')]));
+    [t.manual?'직접 확정':'', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')]));
   const wsM = XLSX.utils.aoa_to_sheet(mtx);
   styleRow(wsM, 0, mh.length, HEAD_N);
   files.forEach((f,fi)=>{ [4+fi, 4+files.length+fi].forEach(c=>{ wsM[enc({r:0,c})].s = headOf(f); }); });
@@ -1027,10 +1149,10 @@ function buildCombined(){
   // 3. 중복대상: 2개 이상 목록, 목록별 정보를 한 줄에
   const head = ['번호','인근묶음','있는 목록','판정'];
   const spans = [];
-  files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 행`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
+  files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 위치`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
   const dup = [head]; let n = 0;
   sorted.filter(t=>t.n>1).forEach(t=>{
-    const row = [++n, t.near||'', placesText(t), [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':''].filter(Boolean).join(', ')];
+    const row = [++n, t.near||'', placesText(t), [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')];
     files.forEach((f,fi)=>{ const r = t.byFile[fi][0]; row.push(refList(t.byFile[fi]), ...f.headers.map((_,c)=> r ? r.cells[c] : '')); });
     dup.push(row);
   });
@@ -1041,8 +1163,8 @@ function buildCombined(){
 
   // 4. 파일마다 그 목록에만 있는 대상
   files.forEach((f,fi)=>{
-    const aoa = [['원본 행','인근묶음','비슷한 후보(확인 필요)', ...f.headers]];
-    f.rows.filter(r=>r.target.n===1).forEach(r=>aoa.push([r.excelRow, r.near||'', r.candTxt||'', ...r.cells]));
+    const aoa = [[f.multi?'원본 위치(시트 행)':'원본 행','인근묶음','비슷한 후보(확인 필요)', ...f.headers]];
+    f.rows.filter(r=>r.target.n===1).forEach(r=>aoa.push([f.multi ? r.ref : r.excelRow, r.near||'', r.candTxt||'', ...r.cells]));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     styleRow(ws, 0, aoa[0].length, headOf(f));
     finishTable(ws, aoa);
@@ -1051,7 +1173,7 @@ function buildCombined(){
 
   // 5. 배분용 전체대상
   const ordered = orderedTargets();
-  const dist = [['인근묶음','묶음 범위','있는 목록','목록 수','대상물','주소', ...files.map(f=>`${f.label} 행`),'배정 팀']];
+  const dist = [['인근묶음','묶음 범위','있는 목록','목록 수','대상물','주소', ...files.map(f=>`${f.label} 위치`),'배정 팀']];
   ordered.forEach(([g,t])=>dist.push([g?g.id:'', g?g.where:'', placesText(t), t.n, t.name, t.addr, ...files.map((f,fi)=>refList(t.byFile[fi])), '']));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
   styleRow(wsX, 0, dist[0].length, HEAD_N);
@@ -1061,7 +1183,7 @@ function buildCombined(){
   XLSX.utils.book_append_sheet(wb, wsX, safeSheetName('배분용 전체대상', used));
 
   // 6. 파일마다 원본 전체 + 표시
-  files.forEach((f,fi)=>XLSX.utils.book_append_sheet(wb, markSheet(fi), safeSheetName(`${f.label} 전체`, used)));
+  files.forEach((f,fi)=>XLSX.utils.book_append_sheet(wb, f.multi ? mergedMarkSheet(fi) : markSheet(fi,0), safeSheetName(`${f.label} 전체`, used)));
   return wb;
 }
 const fileSafe = s => s.replace(/[\\\/:*?"<>|]/g,'_');
@@ -1102,7 +1224,7 @@ let tt;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true,2800); }
 
 $('#addItem').addEventListener('click',()=>{ state.nItems++; refreshAll(); });
-['optSpace','optCase','optPunct'].forEach(id=>$('#'+id).addEventListener('change',()=>{ compare(); renderResult(); }));
+['optSpace','optCase','optPunct','optAddrSplit'].forEach(id=>$('#'+id).addEventListener('change',()=>{ compare(); renderResult(); }));
 $('#optFuzzy').addEventListener('change',e=>{ state.fuzzy=+e.target.value; compare(); renderResult(); });
 
 /* ---------- 시작: 예시 데이터 ---------- */
