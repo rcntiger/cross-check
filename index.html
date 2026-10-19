@@ -1299,11 +1299,12 @@ function stamp(withTime){
 /* 현장점검 지도(field-check)용 파일
    - 지도는 열 이름 키워드로 이름·주소·그룹/팀·추가정보를 찾음 → 열 이름을 이름/주소/팀/비고로 고정
    - 지도는 빈 칸을 위 칸 값으로 채움(병합 셀 처리) → 모든 칸을 비우지 않음, 주소 없는 대상은 제외
-   - 지도의 엑셀 읽기는 기본 머리글 행이 2행 → 1행에 제목, 2행에 머리글을 둠 */
+   - 지도의 엑셀 읽기는 제목 줄을 건너뛰고 머리글을 찾음 → 1행에 제목, 2행에 머리글을 둠
+   - 구분 열: 대상이 든 목록 이름(예: 조사 / 훈련 / 조사·훈련) → 지도에서 마커 모양·구분 필터로 씀 */
 function buildFieldCheck(){
   const files = state.files;
   const title = `현장점검 지도용 · ${files.map(f=>f.label).join(' + ')} · ${stamp()}`;
-  const rows = [[title,'','',''],['이름','주소','팀','비고']];
+  const rows = [[title,'','','',''],['이름','주소','팀','구분','비고']];
   let skipped = 0, gi = -1, last = null;
   const bands = [];
   const nearById = {}; state.res.near.forEach(g=>nearById[g.id]=g);
@@ -1315,15 +1316,16 @@ function buildFieldCheck(){
     const note = [t.n>1 ? `${t.n}개 목록(${placesText(t)})` : placesText(t)];
     if(g) note.push(`${g.id}(${g.where})`);
     note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}행`).join(' / '));
-    rows.push([name, t.addr, team, note.join(' · ')]);
+    const kind = t.inFiles.map(x=>files[x].label).join('·');
+    rows.push([name, t.addr, team, kind, note.join(' · ')]);
     if(state.mapTeam==='assign'){ const k=t.center+'|'+t.team; if(k!==last){ gi++; last=k; } bands.push(gi%2); }
     else if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['A1'].s = {font:{bold:true,sz:12}};
-  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:3}}];
-  styleRow(ws, 1, 4, HEAD_N);
-  bands.forEach((b,i)=>{ if(b>=0) styleRow(ws, i+2, 4, BAND[b]); });
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}}];
+  styleRow(ws, 1, 5, HEAD_N);
+  bands.forEach((b,i)=>{ if(b>=0) styleRow(ws, i+2, 5, BAND[b]); });
   ws['!cols'] = autoCols(rows.slice(1));
   ws['!freeze'] = {xSplit:0,ySplit:2};
   const wb = XLSX.utils.book_new();
