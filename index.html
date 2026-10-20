@@ -1300,11 +1300,24 @@ function stamp(withTime){
    - 지도는 열 이름 키워드로 이름·주소·그룹/팀·추가정보를 찾음 → 열 이름을 이름/주소/팀/비고로 고정
    - 지도는 빈 칸을 위 칸 값으로 채움(병합 셀 처리) → 모든 칸을 비우지 않음, 주소 없는 대상은 제외
    - 지도의 엑셀 읽기는 제목 줄을 건너뛰고 머리글을 찾음 → 1행에 제목, 2행에 머리글을 둠
-   - 구분 열: 대상이 든 목록 이름(예: 조사 / 훈련 / 조사·훈련) → 지도에서 마커 모양·구분 필터로 씀 */
+   - 구분 열: 대상이 든 목록 이름(예: 조사 / 훈련 / 조사·훈련) → 지도에서 마커 모양·구분 필터로 씀
+   - 관할센터·등급·용도: 원본 목록에서 가져와 지도 정보카드에 보여 줄 수 있게 함 (열 이름이 지도의 이름·주소·팀 키워드와 겹치지 않음) */
+function useColOf(f){ return f.headers.findIndex(h=>/용도/.test(norm(h))); }
+function fcInfo(t){
+  const files = state.files;
+  const first = col => { for(const r of t.rows){ const i = col(files[r.fi]); if(i!=null && i>=0){ const v = String(r.cells[i] ?? '').trim(); if(v) return v; } } return ''; };
+  let center = t.center && t.center!=='전체' && t.center!=='관할 미지정' ? t.center : first(f=>f.centerCol);
+  // 등급: 여러 목록이면 가장 높은 등급 (특급 > 1급 > 2급 > 3급), 등급으로 못 읽으면 원본 글자 그대로
+  let grade = '';
+  t.rows.forEach(r=>{ const f=files[r.fi]; if(f.gradeCol!=null && f.gradeCol>=0){ const g=gradeOf(r.cells[f.gradeCol]); if(g!=='기타' && (!grade || GRADES.indexOf(g)<GRADES.indexOf(grade))) grade=g; } });
+  if(!grade) grade = first(f=>f.gradeCol);
+  return { center, grade, use: first(useColOf) };
+}
 function buildFieldCheck(){
   const files = state.files;
   const title = `현장점검 지도용 · ${files.map(f=>f.label).join(' + ')} · ${stamp()}`;
-  const rows = [[title,'','','',''],['이름','주소','팀','구분','비고']];
+  const HEAD = ['이름','주소','팀','구분','관할센터','등급','용도','비고'], NC = HEAD.length;
+  const rows = [[title,...Array(NC-1).fill('')], HEAD];
   let skipped = 0, gi = -1, last = null;
   const bands = [];
   const nearById = {}; state.res.near.forEach(g=>nearById[g.id]=g);
@@ -1317,15 +1330,18 @@ function buildFieldCheck(){
     if(g) note.push(`${g.id}(${g.where})`);
     note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}행`).join(' / '));
     const kind = t.inFiles.map(x=>files[x].label).join('·');
-    rows.push([name, t.addr, team, kind, note.join(' · ')]);
+    const info = fcInfo(t);
+    // 지도는 빈 칸을 위 칸 값으로 채우므로(병합 셀 처리) 모르는 값은 '-'로 둠 → 지도에서는 '-'를 빈 값으로 봄
+    const v = x => x || '-';
+    rows.push([name, t.addr, team, kind, v(info.center), v(info.grade), v(info.use), note.join(' · ')]);
     if(state.mapTeam==='assign'){ const k=t.center+'|'+t.team; if(k!==last){ gi++; last=k; } bands.push(gi%2); }
     else if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['A1'].s = {font:{bold:true,sz:12}};
-  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}}];
-  styleRow(ws, 1, 5, HEAD_N);
-  bands.forEach((b,i)=>{ if(b>=0) styleRow(ws, i+2, 5, BAND[b]); });
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:NC-1}}];
+  styleRow(ws, 1, NC, HEAD_N);
+  bands.forEach((b,i)=>{ if(b>=0) styleRow(ws, i+2, NC, BAND[b]); });
   ws['!cols'] = autoCols(rows.slice(1));
   ws['!freeze'] = {xSplit:0,ySplit:2};
   const wb = XLSX.utils.book_new();
