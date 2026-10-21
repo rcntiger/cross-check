@@ -147,6 +147,8 @@ td .meta{font-size:14px}
 .wrow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .wrow label.w{display:inline-flex;gap:6px;align-items:center;font-size:15px}
 .wrow input[type=number]{width:72px}
+.wrow.improw{flex-direction:column;align-items:flex-start;gap:6px}
+.improw .chips .meta{min-width:32px}
 .asum{display:grid;gap:6px}
 .asum-h{font-size:16px}
 select.tsel{padding:3px 6px}
@@ -229,7 +231,8 @@ const state = {
   nItems: 1,          // 비교 항목 수 (파일마다 keys[i]로 열을 고름)
   span: 20,           // 인근 대상물 범위(건물번호 차이), -1 = 표시 안 함
   fuzzy: 0.85, aliases: [], rejected: new Set(), mapTeam: 'assign',
-  balance: 'perlist', combo: 0.75, gradeW: {'특급':2, '1급':1.5, '2급':1, '3급':1, '기타':1}, teams: {}, allocOverride: new Map(), tteam: '',
+  balance: 'perlist', imp: {on:false, grades:new Set(), kinds:new Set()},   // 중요 대상: 고른 등급·구분 → 팀마다 고르게
+  combo: 0.75, gradeW: {'특급':2, '1급':1.5, '2급':1, '3급':1, '기타':1}, teams: {}, allocOverride: new Map(), tteam: '',
   tab: 'matrix', filter: 'dup', ffilter: 'all',
   res: null
 };
@@ -734,6 +737,7 @@ function compare(){
       order: first.fi*1e9 + first.si*1e6 + first.excelRow};
     rows.forEach(r=>r.target=t);
     t.kind = kindText(t); t.kindN = kindCount(t);
+    t.kindKeys = kindsOf(t).flatMap(k=>{ const f=files[k.fi]; return k.sheets.length ? k.sheets.map(s=>`${f.label}·${s}`) : [f.label]; });
     return t;
   }).sort((x,y)=>x.order-y.order);
   const near = groupNear(targets);
@@ -818,6 +822,44 @@ function prepAlloc(targets){
   const map = centerMap(raws);
   targets.forEach(t=>{ t.center = anyCenter ? (map[t.centerRaw] || '관할 미지정') : '전체'; });
 }
+// ━━ 중요 대상 ━━ 고른 등급이거나 고른 구분(파일·시트)에 들어 있는 대상
+function impOn(){ return state.balance!=='weight' && state.imp.on && (state.imp.grades.size>0 || state.imp.kinds.size>0); }
+function isImp(t){ return impOn() && (state.imp.grades.has(t.grade) || (t.kindKeys||[]).some(k=>state.imp.kinds.has(k))); }
+function kindOptions(){ return state.files.flatMap(f=>f.multi ? f.parts.map(p=>`${f.label}·${p.short}`) : [f.label]); }
+// 지역 순서로 늘어놓은 list를 k팀에 개수로 똑같이 나눔 (팀 간 건수 차이 최대 1곳).
+// 중요 대상 옵션이 켜져 있으면: 중요 대상을 한 곳씩 '고른 항목(등급·구분)마다 그 팀이 가진 수'가 가장 적은 팀에 넣음
+//   (한 대상이 여러 항목에 들면 그 항목들을 모두 셈, 같으면 원래 지역 순서상 맡을 팀) → 나머지 대상으로 팀마다 건수를 채움
+function impClasses(t){
+  const out = [];
+  state.imp.grades.forEach(g=>{ if(t.grade===g) out.push('g:'+g); });
+  state.imp.kinds.forEach(k=>{ if((t.kindKeys||[]).includes(k)) out.push('k:'+k); });
+  return out;
+}
+function splitEven(list, teams){
+  const n = list.length, k = Math.max(1, teams.length); if(!n) return;
+  const cap = [...Array(k).keys()].map(i=>Math.ceil((i+1)*n/k) - Math.ceil(i*n/k));
+  const home = i => Math.min(k-1, Math.floor(i*k/n));   // 지역 순서상 맡을 팀
+  const plain = () => list.forEach((t,i)=>{ t.autoTeam = teams[home(i)] || '미배정'; });
+  if(!impOn() || k<2){ plain(); return; }
+  const I = [], R = [];
+  list.forEach((t,i)=>{ const cs = impClasses(t); if(cs.length) I.push({t, i, cs}); else R.push(t); });
+  if(!I.length){ plain(); return; }
+  const size = {}; I.forEach(x=>x.cs.forEach(c=>size[c]=(size[c]||0)+1));
+  // 드문 항목에 든 대상부터 놓아야 그 항목이 고르게 나뉨
+  I.sort((a,b)=>Math.min(...a.cs.map(c=>size[c])) - Math.min(...b.cs.map(c=>size[c])) || a.i-b.i);
+  const have = {}, used = new Array(k).fill(0);
+  I.forEach(x=>{
+    let best = -1, bs = Infinity;
+    for(let j=0;j<k;j++){
+      if(used[j]>=cap[j]) continue;
+      const sc = x.cs.reduce((s,c)=>s + ((have[c]||[])[j]||0) / size[c], 0) + used[j]/n*0.001 + (j===home(x.i)?0:1e-6);
+      if(sc < bs){ bs = sc; best = j; }
+    }
+    x.t.autoTeam = teams[best] || '미배정'; used[best]++;
+    x.cs.forEach(c=>{ (have[c] = have[c] || new Array(k).fill(0))[best]++; });
+  });
+  let j = 0; for(let i=0;i<k;i++) for(let c=used[i]; c<cap[i]; c++) R[j++].autoTeam = teams[i] || '미배정';
+}
 function teamsOf(center){
   const v = state.teams[center];
   const list = String(v==null ? '1팀, 2팀, 3팀' : v).split(/[,，\n]/).map(s=>s.trim()).filter(Boolean);
@@ -842,16 +884,12 @@ function runAlloc(targets, near){
       const seq = arr.flatMap(u=>u.members.slice().sort((a,b)=>(a.pa?a.pa.num:1e9)-(b.pa?b.pa.num:1e9)));
       const byCat = new Map();
       seq.forEach(t=>{ const c=t.inFiles.join(','); let l=byCat.get(c); if(!l) byCat.set(c, l=[]); l.push(t); });
-      byCat.forEach(l=>{
-        const n = l.length;
-        l.forEach((t,i)=>{ t.autoTeam = teams[Math.min(k-1, Math.floor(i * k / n))] || '미배정'; });
-      });
+      byCat.forEach(l=>splitEven(l, teams));
     }else if(state.balance==='count'){
       // 대상 수를 똑같이: 지역 순서대로 늘어놓고 개수로 정확히 나눈다 (팀 간 차이 최대 1곳)
       // 경계에 걸린 인근 대상물만 두 팀으로 나뉠 수 있다
       const seq = arr.flatMap(u=>u.members.slice().sort((a,b)=>(a.pa?a.pa.num:1e9)-(b.pa?b.pa.num:1e9)));
-      const N = seq.length;
-      seq.forEach((t,i)=>{ t.autoTeam = teams[Math.min(k-1, Math.floor(i*k/N))] || '미배정'; });
+      splitEven(seq, teams);
     }else{
       let cum = 0, ti = 0;
       arr.forEach(u=>{
@@ -867,7 +905,7 @@ function runAlloc(targets, near){
       const mine = list.filter(t=>t.team===name);
       const dongs = {}; mine.forEach(t=>{ if(t.dong) dongs[t.dong]=(dongs[t.dong]||0)+1; });
       return {name, count:mine.length, w:Math.round(mine.reduce((s,t)=>s+t.w,0)*10)/10,
-        multi: mine.filter(t=>t.n>1).length,
+        multi: mine.filter(t=>t.n>1).length, imp: mine.filter(isImp).length,
         per: state.files.map((f,fi)=>mine.filter(t=>t.byFile[fi].length).length),
         only: state.files.map((f,fi)=>mine.filter(t=>t.n===1 && t.inFiles[0]===fi).length),
         grades: GRADES.map(g=>mine.filter(t=>t.grade===g).length),
@@ -875,7 +913,7 @@ function runAlloc(targets, near){
     });
     out.push({name:cname, teams:teamStats, count:list.length, w:Math.round(total*10)/10, split:[...splitNear], raws:[...new Set(list.map(t=>t.centerRaw).filter(r=>r && r!==cname))]});
   });
-  return {centers: out, manual: targets.filter(t=>t.teamManual).length};
+  return {centers: out, manual: targets.filter(t=>t.teamManual).length, impN: targets.filter(isImp).length};
 }
 
 /* ---------- 화면: 파일 ---------- */
@@ -1070,8 +1108,8 @@ function renderResult(){
     const A = res.alloc;
     const isW = state.balance==='weight';
     html += A.centers.map(c=>`<div class="asum"><div class="asum-h"><b>${esc(c.name)}</b> <span class="meta">대상 ${c.count.toLocaleString()}곳${isW?` · 업무량 ${c.w.toLocaleString()}`:''} · 팀 ${c.teams.length}개 · 팀당 약 ${Math.round(c.count/Math.max(1,c.teams.length))}곳${c.split.length?` · 경계에서 나뉜 인근 대상물 ${c.split.length}개`:''}</span></div>
-      <div class="tbl" style="max-height:none"><table><thead><tr><th>팀</th><th class="num">대상</th>${files.map(f=>`<th class="num">${esc(f.label)}</th>`).join('')}<th class="num">함께 방문</th>${files.map(f=>`<th class="num">${esc(f.label)}만</th>`).join('')}${isW?'<th class="num">업무량</th>':''}<th class="num">특급</th><th class="num">1급</th><th class="num">2급</th><th class="num">3급</th><th>주요 동</th></tr></thead><tbody>
-      ${c.teams.map(t=>{ const avgW = c.w/Math.max(1,c.teams.length); const dev = avgW ? Math.round((t.w-avgW)/avgW*100) : 0; return `<tr><td><b>${esc(t.name)}</b></td><td class="num"><b>${t.count}</b></td>${t.per.map(n=>`<td class="num">${n}</td>`).join('')}<td class="num">${t.multi}</td>${t.only.map(n=>`<td class="num">${n}</td>`).join('')}${isW?`<td class="num">${t.w} <span class="meta">${dev>0?'+':''}${dev}%</span></td>`:''}${t.grades.slice(0,4).map(n=>`<td class="num">${n}</td>`).join('')}<td class="clip ad" title="${esc(t.dongs)}">${esc(t.dongs)}</td></tr>`; }).join('')}
+      <div class="tbl" style="max-height:none"><table><thead><tr><th>팀</th><th class="num">대상</th>${files.map(f=>`<th class="num">${esc(f.label)}</th>`).join('')}<th class="num">함께 방문</th>${files.map(f=>`<th class="num">${esc(f.label)}만</th>`).join('')}${isW?'<th class="num">업무량</th>':''}${impOn()&&!isW?'<th class="num">중요</th>':''}<th class="num">특급</th><th class="num">1급</th><th class="num">2급</th><th class="num">3급</th><th>주요 동</th></tr></thead><tbody>
+      ${c.teams.map(t=>{ const avgW = c.w/Math.max(1,c.teams.length); const dev = avgW ? Math.round((t.w-avgW)/avgW*100) : 0; return `<tr><td><b>${esc(t.name)}</b></td><td class="num"><b>${t.count}</b></td>${t.per.map(n=>`<td class="num">${n}</td>`).join('')}<td class="num">${t.multi}</td>${t.only.map(n=>`<td class="num">${n}</td>`).join('')}${isW?`<td class="num">${t.w} <span class="meta">${dev>0?'+':''}${dev}%</span></td>`:''}${impOn()&&!isW?`<td class="num"><b>${t.imp}</b></td>`:''}${t.grades.slice(0,4).map(n=>`<td class="num">${n}</td>`).join('')}<td class="clip ad" title="${esc(t.dongs)}">${esc(t.dongs)}</td></tr>`; }).join('')}
       </tbody></table></div></div>`).join('');
     const opts = A.centers.flatMap(c=>c.teams.map(t=>[c.name+'|'+t.name, (A.centers.length>1?centerShort(c.name)+' ':'')+t.name]));
     let list = allocOrdered();
@@ -1153,6 +1191,12 @@ function renderAlloc(){
         <option value="weight" ${state.balance==='weight'?'selected':''}>업무량 가중치로 (등급·업무 종류 반영)</option>
       </select></label>
     </div>
+    ${state.balance!=='weight' ? `<div class="wrow improw">
+      <label class="w"><input type="checkbox" id="impOn" ${state.imp.on?'checked':''}> <b>중요 대상도 팀마다 고르게</b> <span class="meta">건수는 그대로 두고, 고른 등급·구분이 한 팀에 몰리지 않게 나눔${impOn()?` · 중요 대상 <b>${A.impN.toLocaleString()}곳</b>`:''}</span></label>
+      ${state.imp.on ? `${!state.imp.grades.size && !state.imp.kinds.size ? '<span class="meta">아래에서 중요하게 볼 등급이나 구분을 고르세요 (여러 개 가능)</span>' : ''}
+      <div class="chips"><span class="meta">등급</span>${GRADES.slice(0,4).map(g=>`<button type="button" aria-pressed="${state.imp.grades.has(g)}" data-impg="${g}">${g}</button>`).join('')}</div>
+      <div class="chips"><span class="meta">구분</span>${kindOptions().map(k=>`<button type="button" aria-pressed="${state.imp.kinds.has(k)}" data-impk="${esc(k)}">${esc(k)}</button>`).join('')}</div>` : ''}
+    </div>` : ''}
     ${state.balance==='weight' ? `<div class="wrow">
       <span class="meta"><b>업무량 가중치</b></span>
       ${files.map((f,fi)=>`<label class="w" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)} <input type="number" step="0.1" min="0" data-fw="${fi}" value="${f.weight}"></label>`).join('')}
@@ -1167,6 +1211,10 @@ function renderAlloc(){
   box.querySelectorAll('[data-gw]').forEach(i=>i.addEventListener('change',e=>{ state.gradeW[i.dataset.gw] = Math.max(0, +e.target.value || 0); recalc(); }));
   const wc = $('#wCombo'); if(wc) wc.addEventListener('change',e=>{ state.combo = Math.max(0, +e.target.value || 0); recalc(); });
   $('#balance').addEventListener('change',e=>{ state.balance = e.target.value; recalc(); });
+  const tog = (set,v) => { set.has(v) ? set.delete(v) : set.add(v); recalc(); };
+  const io = $('#impOn'); if(io) io.addEventListener('change',e=>{ state.imp.on = e.target.checked; recalc(); });
+  box.querySelectorAll('[data-impg]').forEach(b=>b.addEventListener('click',()=>tog(state.imp.grades, b.dataset.impg)));
+  box.querySelectorAll('[data-impk]').forEach(b=>b.addEventListener('click',()=>tog(state.imp.kinds, b.dataset.impk)));
   const rm = $('#resetManual'); if(rm) rm.addEventListener('click',()=>{ state.allocOverride.clear(); recalc(); toast('손으로 바꾼 배정을 되돌렸습니다'); });
 }
 const centerShort = c => String(c).replace(/119안전센터$/,'').replace(/안전센터$/,'') || c;
@@ -1431,13 +1479,13 @@ function buildCombined(){
 
   // 1-2. 팀배분 요약
   const isW = state.balance==='weight';
-  const ah = ['관할센터','팀','대상', ...files.map(f=>f.label), '함께 방문', ...files.map(f=>`${f.label}만`), ...(isW?['업무량','평균 대비']:[]), '특급','1급','2급','3급','기타','주요 동'];
+  const ah = ['관할센터','팀','대상', ...files.map(f=>f.label), '함께 방문', ...files.map(f=>`${f.label}만`), ...(isW?['업무량','평균 대비']:[]), ...(impOn()&&!isW?['중요 대상']:[]), '특급','1급','2급','3급','기타','주요 동'];
   const asum = [ah];
   res.alloc.centers.forEach(c=>{ const avg = c.w/Math.max(1,c.teams.length);
-    c.teams.forEach(t=>asum.push([c.name, t.name, t.count, ...t.per, t.multi, ...t.only, ...(isW?[t.w, avg?`${Math.round((t.w-avg)/avg*100)}%`:'']:[]), ...t.grades, t.dongs]));
+    c.teams.forEach(t=>asum.push([c.name, t.name, t.count, ...t.per, t.multi, ...t.only, ...(isW?[t.w, avg?`${Math.round((t.w-avg)/avg*100)}%`:'']:[]), ...(impOn()&&!isW?[t.imp]:[]), ...t.grades, t.dongs]));
     asum.push([`${c.name} 합계`,'',c.count, ...files.map((f,fi)=>c.teams.reduce((n,t)=>n+t.per[fi],0)), c.teams.reduce((n,t)=>n+t.multi,0)]); });
   asum.push([]);
-  asum.push([isW ? '나누는 기준: 업무량 가중치 = (들어 있는 목록의 가중치 합) × (여러 목록이면 함께 방문 ' + state.combo + ') × 등급 가중치 (' + GRADES.map(g=>g+' '+state.gradeW[g]).join(', ') + ')' : '나누는 기준: 대상 수를 똑같이 (동·도로·번호 순으로 이어서 나눔, 팀 간 차이 최대 1곳)']);
+  asum.push([isW ? '나누는 기준: 업무량 가중치 = (들어 있는 목록의 가중치 합) × (여러 목록이면 함께 방문 ' + state.combo + ') × 등급 가중치 (' + GRADES.map(g=>g+' '+state.gradeW[g]).join(', ') + ')' : '나누는 기준: 대상 수를 똑같이 (동·도로·번호 순으로 이어서 나눔, 팀 간 차이 최대 1곳)' + (impOn() ? ` · 중요 대상(${[...state.imp.grades, ...state.imp.kinds].join(', ')})은 팀마다 고르게` : '')]);
   asum.push(['손으로 바꾼 배정 ' + res.alloc.manual + '곳']);
   const wsA = XLSX.utils.aoa_to_sheet(asum);
   styleRow(wsA, 0, ah.length, HEAD_N);
@@ -1493,9 +1541,9 @@ function buildCombined(){
   // 5. 배분용 전체대상: 관할센터 → 배정 팀 → 동·도로·번호 순, 같은 인근 대상물은 붙어 있음
   const A = res.alloc, multiC = A.centers.length>1;
   const ordered = allocOrdered();
-  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','해당 구분','등급', ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 위치`)]];
+  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','해당 구분','등급', ...(impOn()?['중요']:[]), ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 위치`)]];
   const nearWhere = {}; res.near.forEach(g=>nearWhere[g.id]=g.where);
-  ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.kind, t.grade, ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
+  ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.kind, t.grade, ...(impOn()?[isImp(t)?'○':'']:[]), ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
   styleRow(wsX, 0, dist[0].length, HEAD_N);
   let gi = -1, last = null;
@@ -1506,8 +1554,8 @@ function buildCombined(){
   // 6. 팀별 시트: 팀마다 맡을 대상
   A.centers.forEach(c=>teamsOf(c.name).forEach(team=>{
     const mine = ordered.filter(t=>t.center===c.name && t.team===team);
-    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','해당 구분','등급', ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
-    mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.kind, t.grade, ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
+    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','해당 구분','등급', ...(impOn()?['중요']:[]), ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
+    mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.kind, t.grade, ...(impOn()?[isImp(t)?'○':'']:[]), ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     styleRow(ws, 0, aoa[0].length, HEAD_N);
     mine.forEach((t,i)=>{ if(t.n>1) styleRow(ws, i+1, 6, FILL); });
