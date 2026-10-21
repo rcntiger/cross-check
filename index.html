@@ -965,7 +965,8 @@ function renderResult(){
     ${files.map(f=>`<button data-dl="f${f.id}" type="button" class="small">${esc(f.label)} 표시본</button>`).join('')}
   </div>
   <div class="mapdl">
-    <div><b>현장점검(field-check) 앱 업로드용 파일 만들기</b></div>
+    <div><b>현장점검(field-check) 앱 업로드용 파일 만들기</b>
+      <div class="meta">현장점검(field-check) 맵 앱의 업로드용으로 이름·주소·팀·구분·관할센터·등급·용도·비고 8개 열로 된 Excel 파일을 만듭니다. 접속 주소 <a href="https://rcntiger.github.io/field-check/" target="_blank" rel="noopener">https://rcntiger.github.io/field-check/</a></div></div>
     <div class="row">
       <label class="f">파일의 팀열에 표시할 값<select id="mapTeam">
         <option value="assign" ${state.mapTeam==='assign'?'selected':''}>배정 팀 (팀 배분 결과)</option>
