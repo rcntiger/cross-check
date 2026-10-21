@@ -111,6 +111,8 @@ th.fcol{white-space:normal;min-width:140px;max-width:240px}
 td.clip{overflow:hidden;text-overflow:ellipsis}
 td.clip.nm{max-width:240px}
 td.clip.ad{max-width:220px}
+td.kd{min-width:200px;max-width:300px;white-space:normal;line-height:1.45}
+td.kd .kf{font-weight:600;color:var(--fc)}
 tr.dup td{background:var(--dup-bg)}
 .pill{display:inline-block;font-size:14px;font-weight:600;padding:0 8px;border-radius:999px;background:var(--dup);color:var(--surface)}
 .pill.no{background:transparent;color:var(--muted);font-weight:400;padding:0}
@@ -635,9 +637,22 @@ function dropDecisions(fileId){
 }
 /* 같은 대상 연결: 기준값이 같은 행끼리, 그리고 사람이 확정한 쌍끼리 모두 이어서 한 대상으로 묶는다.
    A=B, B=C 이면 A·B·C가 한 대상 (union-find) */
+// 비교할 수 있는 상태: 파일 2개 이상, 또는 시트가 여러 개인 파일 1개(시트끼리 비교)
+function ready(){ const fs=state.files; return fs.length>=2 || (fs.length===1 && fs[0].multi); }
+/* ━━ 해당 구분 ━━ 같은 대상이 여러 파일·여러 시트에 흩어져 있어도 무엇에 해당하는지 한 칸에 모음
+   파일이 시트 하나면 그 파일 이름(부서/구분 이름), 시트가 여러 개면 "파일 이름: 시트, 시트" */
+function kindsOf(t){
+  return t.inFiles.map(fi=>{ const f=state.files[fi];
+    const sis=[...new Set(t.byFile[fi].map(r=>r.part))].sort((a,b)=>a-b);
+    return {fi, sheets: f.multi ? sis.map(pi=>f.parts[pi].short) : []}; });
+}
+function kindText(t){ return kindsOf(t).map(k=>{ const f=state.files[k.fi]; return k.sheets.length ? `${f.label}: ${k.sheets.join(', ')}` : f.label; }).join(' / '); }
+function kindCount(t){ return kindsOf(t).reduce((n,k)=>n+Math.max(1,k.sheets.length),0); }
+// 시트별 ○ 칸 (시트가 여러 개인 파일만): [{fi, pi, head}]
+function sheetCols(){ const out=[]; state.files.forEach((f,fi)=>{ if(f.multi) f.parts.forEach((p,pi)=>out.push({fi,pi,head:`${f.label}·${p.short}`})); }); return out; }
 function compare(){
   const files = state.files;
-  if(files.length<2){ state.res=null; return; }
+  if(!ready()){ state.res=null; return; }
   ensureCols(); readOpts();
   const parent = new Map();
   const find = x => { while(parent.get(x)!==x){ parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
@@ -688,6 +703,7 @@ function compare(){
       addr: (rows.find(r=>r.addrTxt)||{}).addrTxt || '',
       order: first.fi*1e9 + first.si*1e6 + first.excelRow};
     rows.forEach(r=>r.target=t);
+    t.kind = kindText(t); t.kindN = kindCount(t);
     return t;
   }).sort((x,y)=>x.order-y.order);
   const near = groupNear(targets);
@@ -704,6 +720,7 @@ function compare(){
   state.res = {targets, near, cands, perFile, alloc,
     multi: targets.filter(t=>t.n>1).length,
     every: targets.filter(t=>t.n===files.length).length,
+    kdup: targets.filter(t=>t.kindN>1).length, anyMulti: files.some(f=>f.multi),
     innerT: targets.filter(t=>t.inner).length,
     manualT: targets.filter(t=>t.manual && t.n>1).length,
     unparsed: targets.filter(t=>t.addr && !t.pa).length,
@@ -891,7 +908,7 @@ function colSelect(f, val, attrs, withNone){
 }
 function renderItems(){
   const box = $('#items');
-  if(state.files.length<2){ box.innerHTML=''; $('#addItem').disabled=true; return; }
+  if(!ready()){ box.innerHTML=''; $('#addItem').disabled=true; return; }
   ensureCols();
   $('#addItem').disabled = false;
   box.innerHTML = Array.from({length:state.nItems},(_,i)=>`<div class="item">
@@ -903,7 +920,7 @@ function renderItems(){
 }
 function renderNear(){
   const box = $('#nearRow');
-  if(state.files.length<2){ box.innerHTML=''; return; }
+  if(!ready()){ box.innerHTML=''; return; }
   const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'표시 안 함']];
   box.innerHTML = state.files.map((f,fi)=>`<label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 주소 열</span>${colSelect(f, f.addr, `data-fi="${fi}"`, true)}</label>`).join('')
     + `<label class="f"><span>인근 범위</span><select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
@@ -925,7 +942,7 @@ function renderResult(){
     const n = files.length;
     box.innerHTML = `<h2>결과</h2><div class="start">
       <ol>
-        <li><b>파일 올리기</b> 엑셀 파일 2개 이상 업로드 ${n===1?'<span class="samplechip">1개 더 필요</span>':''}</li>
+        <li><b>파일 올리기</b> 엑셀 파일 2개 이상 업로드 (시트가 여러 개인 파일은 1개로도 시트끼리 비교) ${n===1?'<span class="samplechip">1개 더 필요</span>':''}</li>
         <li><b>비교 기준 확인</b> 비교 기준 자동선택, 다를시 변경</li>
         <li><b>결과 확인과 내려받기</b> 대조표 확인 후, 통합 결과 엑셀과 현장점검 지도용 파일 다운로드</li>
       </ol>
@@ -936,7 +953,8 @@ function renderResult(){
   let html = `<h2>결과</h2>
   <div class="summary">
     <div class="stat"><div class="k">전체 대상물 (중복 합침)</div><div class="v">${res.targets.length.toLocaleString()}</div></div>
-    <div class="stat hot"><div class="k">2개 이상 목록에 있음</div><div class="v">${res.multi.toLocaleString()}</div></div>
+    ${N>1?`<div class="stat hot"><div class="k">2개 이상 목록에 있음</div><div class="v">${res.multi.toLocaleString()}</div></div>`:''}
+    ${res.anyMulti?`<div class="stat hot"><div class="k">2개 이상 구분(파일·시트)에 있음</div><div class="v">${res.kdup.toLocaleString()}</div></div>`:''}
     ${N>2?`<div class="stat hot"><div class="k">모든 목록(${N}개)에 있음</div><div class="v">${res.every.toLocaleString()}</div></div>`:''}
     <div class="stat near"><div class="k">인근 대상물</div><div class="v">${res.near.length.toLocaleString()} <span class="meta">개 지역 · 대상 ${res.near.reduce((n,g)=>n+g.members.length,0)}곳</span></div></div>
   </div>
@@ -952,7 +970,7 @@ function renderResult(){
     <div class="meta">통합 결과 파일의 시트 구성</div>
     <ol>
       <li><b>요약</b>, <b>팀배분 요약</b> 파일별 건수와 비교 기준, 팀별 대상 수·업무량</li>
-      <li><b>대조표</b> 전체 대상물 ${res.targets.length}곳이 각 목록에 있는지 ○ 표시</li>
+      <li><b>대조표</b> 전체 대상물 ${res.targets.length}곳이 각 목록에 있는지 ○ 표시${res.anyMulti?' · 해당 구분(파일·시트)과 시트별 ○':''}</li>
       <li><b>중복대상</b> 2개 이상 목록에 있는 ${res.multi}곳, 목록별 정보를 한 줄에 나란히</li>
       <li><b>○○에만</b> 파일마다 그 목록에만 있는 대상 (${N}개 시트)</li>
       <li><b>배분용 전체대상</b> 중복을 하나로 합친 ${res.targets.length}곳, 관할센터·배정 팀·동 순으로 정렬</li>
@@ -985,20 +1003,22 @@ function renderResult(){
   </div>`;
   const LIMIT = 500;
   if(state.tab==='matrix'){
+    if(state.filter==='dup' && N<2) state.filter='kdup';   // 파일 1개(시트끼리 비교)
     const flt = state.filter;
     let list = res.targets;
     if(flt==='dup') list = list.filter(t=>t.n>1);
+    else if(flt==='kdup') list = list.filter(t=>t.kindN>1);
     else if(flt==='every') list = list.filter(t=>t.n===N);
     else if(flt==='inner') list = list.filter(t=>t.inner);
     else if(flt.startsWith('only')){ const fi=+flt.slice(4); list = list.filter(t=>t.n===1 && t.inFiles[0]===fi); }
-    if(flt==='dup' || flt==='every') list = list.slice().sort((x,y)=>(y.n-x.n)||(x.order-y.order));
-    const chips = [['dup','2개 이상 목록'],...(N>2?[['every','모든 목록']]:[]),['all','전체'],...files.map((f,fi)=>['only'+fi, f.label+'에만']),...(res.innerT?[['inner','파일 안 중복']]:[])];
+    if(flt==='dup' || flt==='every' || flt==='kdup') list = list.slice().sort((x,y)=>(y.n-x.n)||(y.kindN-x.kindN)||(x.order-y.order));
+    const chips = [...(res.anyMulti?[['kdup','2개 이상 구분']]:[]),...(N>1?[['dup','2개 이상 목록']]:[]),...(N>2?[['every','모든 목록']]:[]),['all','전체'],...files.map((f,fi)=>['only'+fi, f.label+'에만']),...(res.innerT?[['inner','파일 안 중복']]:[])];
     html += `<div class="toolbar"><div class="chips">${chips.map(([k,t])=>`<button aria-pressed="${flt===k}" data-filter="${k}" type="button">${esc(t)}</button>`).join('')}</div>
       <span class="meta">${list.length.toLocaleString()}곳${list.length>LIMIT?` · 앞의 ${LIMIT}곳만 표시`:''}</span></div>`;
     if(!list.length) html += '<div class="empty">해당하는 대상물이 없습니다.</div>';
-    else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th>
+    else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th><th>해당 구분</th>
         ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</th>`).join('')}<th>인근 대상물</th><th>판정</th></tr></thead><tbody>
-      ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td>
+      ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td><td class="kd">${kindsOf(t).map(k=>{ const f=files[k.fi]; return `<div style="${fc(f)}"><span class="kf">${esc(f.label)}</span>${k.sheets.length?': '+esc(k.sheets.join(', ')):''}</div>`; }).join('')}</td>
         ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?`<span>○ ${refList(t.byFile[fi])}</span>`:'<span class="meta">–</span>'}</td>`).join('')}
         <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
         <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}${t.addrAmbig?' <span class="pill inner">주소 확인</span>':''}</td></tr>`).join('')}
@@ -1084,7 +1104,7 @@ function recalc(){ compare(); renderAlloc(); renderResult(); }
 function renderAlloc(){
   const box = $('#allocBox');
   const res = state.res;
-  if(state.files.length<2 || !res){ box.innerHTML=''; return; }
+  if(!ready() || !res){ box.innerHTML=''; return; }
   const files = state.files, A = res.alloc;
   box.innerHTML = `
     <div class="fgrid">${files.map((f,fi)=>`
@@ -1329,7 +1349,7 @@ function buildFieldCheck(){
     const name = t.name1 || t.name;
     if(!t.addr || !name){ skipped++; return; }
     const team = state.mapTeam==='assign' ? teamFull(t) : state.mapTeam==='near' ? (g ? g.id : '단독') : '미배정';
-    const note = [t.n>1 ? `${t.n}개 목록(${placesText(t)})` : placesText(t)];
+    const note = [`해당 구분: ${t.kind}`];
     if(g) note.push(`${g.id}(${g.where})`);
     note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}행`).join(' / '));
     const kind = t.inFiles.map(x=>files[x].label).join('·');
@@ -1363,6 +1383,7 @@ function buildCombined(){
   const info = [
     ['전체 대상물(중복 합침)', res.targets.length],
     ['2개 이상 목록에 있음', res.multi],
+    ...(res.anyMulti?[['2개 이상 구분(파일·시트)에 있음', res.kdup]]:[]),
     ...(files.length>2?[[`모든 목록(${files.length}개)에 있음`, res.every]]:[]),
     ['그중 직접 확정', res.manualT],
     ['미확인 오타 후보', res.cands.length],
@@ -1394,25 +1415,33 @@ function buildCombined(){
   XLSX.utils.book_append_sheet(wb, wsA, safeSheetName('팀배분 요약', used));
 
   // 2. 대조표: 대상물마다 각 목록에 있는지 ○
-  const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 위치`), '인근 대상물','판정'];
+  const SC = sheetCols();
+  const mh = ['번호','대상물','주소','목록 수','해당 구분','구분 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 위치`), ...SC.map(c=>c.head), '인근 대상물','판정'];
   const mtx = [mh];
-  const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(x.order-y.order));
-  sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])), t.near||'',
+  const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(y.kindN-x.kindN)||(x.order-y.order));
+  sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, t.kind, t.kindN, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])),
+    ...SC.map(c=>t.byFile[c.fi].some(r=>r.part===c.pi)?'○':''), t.near||'',
     [t.manual?'직접 확정':'', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')]));
   const wsM = XLSX.utils.aoa_to_sheet(mtx);
   styleRow(wsM, 0, mh.length, HEAD_N);
-  files.forEach((f,fi)=>{ [4+fi, 4+files.length+fi].forEach(c=>{ wsM[enc({r:0,c})].s = headOf(f); }); });
-  sorted.forEach((t,i)=>{ if(t.n>1) files.forEach((f,fi)=>{ if(t.byFile[fi].length){ const a=enc({r:i+1,c:4+fi}); wsM[a].s={...FILL,alignment:{horizontal:'center'}}; } }); else files.forEach((f,fi)=>{ const a=enc({r:i+1,c:4+fi}); if(wsM[a]) wsM[a].s={alignment:{horizontal:'center'}}; }); });
+  const M0 = 6, S0 = M0+files.length*2;   // 목록 ○ 칸 시작, 시트 ○ 칸 시작
+  files.forEach((f,fi)=>{ [M0+fi, M0+files.length+fi].forEach(c=>{ wsM[enc({r:0,c})].s = headOf(f); }); });
+  SC.forEach((c,k)=>{ wsM[enc({r:0,c:S0+k})].s = headOf(files[c.fi]); });
+  sorted.forEach((t,i)=>{
+    if(t.n>1) files.forEach((f,fi)=>{ if(t.byFile[fi].length){ const a=enc({r:i+1,c:M0+fi}); wsM[a].s={...FILL,alignment:{horizontal:'center'}}; } }); else files.forEach((f,fi)=>{ const a=enc({r:i+1,c:M0+fi}); if(wsM[a]) wsM[a].s={alignment:{horizontal:'center'}}; });
+    if(t.kindN>1){ const a=enc({r:i+1,c:4}); wsM[a].s=FILL; }
+    SC.forEach((c,k)=>{ const a=enc({r:i+1,c:S0+k}); if(wsM[a]) wsM[a].s = wsM[a].v==='○' && t.kindN>1 ? {...FILL,alignment:{horizontal:'center'}} : {alignment:{horizontal:'center'}}; });
+  });
   finishTable(wsM, mtx);
   XLSX.utils.book_append_sheet(wb, wsM, safeSheetName('대조표', used));
 
   // 3. 중복대상: 2개 이상 목록, 목록별 정보를 한 줄에
-  const head = ['번호','인근 대상물','있는 목록','판정'];
+  const head = ['번호','인근 대상물','있는 목록','해당 구분','판정'];
   const spans = [];
   files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 위치`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
   const dup = [head]; let n = 0;
   sorted.filter(t=>t.n>1).forEach(t=>{
-    const row = [++n, t.near||'', placesText(t), [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')];
+    const row = [++n, t.near||'', placesText(t), t.kind, [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')];
     files.forEach((f,fi)=>{ const r = t.byFile[fi][0]; row.push(refList(t.byFile[fi]), ...f.headers.map((_,c)=> r ? r.cells[c] : '')); });
     dup.push(row);
   });
@@ -1434,9 +1463,9 @@ function buildCombined(){
   // 5. 배분용 전체대상: 관할센터 → 배정 팀 → 동·도로·번호 순, 같은 인근 대상물은 붙어 있음
   const A = res.alloc, multiC = A.centers.length>1;
   const ordered = allocOrdered();
-  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','등급', ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 위치`)]];
+  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','해당 구분','등급', ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 위치`)]];
   const nearWhere = {}; res.near.forEach(g=>nearWhere[g.id]=g.where);
-  ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.grade, ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
+  ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.kind, t.grade, ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
   styleRow(wsX, 0, dist[0].length, HEAD_N);
   let gi = -1, last = null;
@@ -1447,11 +1476,11 @@ function buildCombined(){
   // 6. 팀별 시트: 팀마다 맡을 대상
   A.centers.forEach(c=>teamsOf(c.name).forEach(team=>{
     const mine = ordered.filter(t=>t.center===c.name && t.team===team);
-    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','등급', ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
-    mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.grade, ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
+    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','해당 구분','등급', ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
+    mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.kind, t.grade, ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     styleRow(ws, 0, aoa[0].length, HEAD_N);
-    mine.forEach((t,i)=>{ if(t.n>1) styleRow(ws, i+1, 5, FILL); });
+    mine.forEach((t,i)=>{ if(t.n>1) styleRow(ws, i+1, 6, FILL); });
     finishTable(ws, aoa);
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`배정 ${multiC?centerShort(c.name)+' ':''}${team}`, used));
   }));
