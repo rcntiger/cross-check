@@ -55,7 +55,7 @@ header p{margin:4px 0 0;color:var(--muted);word-break:keep-all}
 .tabs .tag,th .tag{min-width:22px;height:22px;font-size:14px;margin-right:5px}
 .refs span{font-weight:700}
 .panel-head{display:flex;align-items:center;gap:8px;min-width:0}
-.panel-head .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.panel-head .fname{font-weight:600;min-width:0;flex:1;word-break:keep-all;overflow-wrap:anywhere;line-height:1.35}   /* 파일 이름은 줄을 바꿔 끝까지 보여 줌 */
 .drop{border:1.5px dashed var(--drop-line);border-radius:8px;padding:18px 14px;text-align:center;color:var(--fg);cursor:pointer;background:linear-gradient(135deg,var(--drop-a),var(--drop-b));transition:border-color .15s,background .15s}
 .drop .meta{color:var(--muted)}
 .drop,.samplerow{word-break:keep-all}
@@ -839,7 +839,7 @@ function renderFiles(){
         <button type="button" class="ghost small" data-replace="${fi}">바꾸기</button>
         <button type="button" class="ghost small" data-remove="${fi}" aria-label="${esc(f.label)} 빼기">빼기</button></div>
       <div class="row">
-        <label class="f">부서/구분 이름<input type="text" id="lbl${f.id}" maxlength="20" value="${esc(f.label)}"></label>
+        <label class="f" style="flex:1 1 100%">부서/구분 이름<input type="text" id="lbl${f.id}" maxlength="40" style="width:100%;box-sizing:border-box" value="${esc(f.label)}"></label>
         ${!f.multi ? (()=>{ const p=f.parts[0]; return `<label class="f">머리글 행<span class="hdrbox"><input type="number" min="1" id="hdr${f.id}" value="${p.headerRow}">${p.hdrAuto?`<span class="autochip" title="${esc(p.hdrWhy||'')}">자동</span>`:`<button type="button" class="ghost small" id="hdrAuto${f.id}">자동으로</button>`}</span></label>`; })() : ''}
       </div>
       ${f.wb.SheetNames.length>1 ? `<div class="sheetbox"><div class="meta">시트 <b>${f.sel.length}</b>/${f.wb.SheetNames.length}개 사용 · 고른 시트를 합쳐 한 목록으로 비교합니다</div>
@@ -1137,7 +1137,7 @@ $('#fileInput').addEventListener('change',e=>{ if(e.target.files.length) handleF
 function freeColor(){ for(let c=0;c<MAXF;c++) if(!state.files.some(f=>f.color===c)) return c; return 0; }
 function newFile(name, wb, label, sample){
   const f = {id: ++fileSeq, name, wb, sel:null, partCfg:{}, partCache:{}, keys:[], addr:null, centerCol:null, gradeCol:null, weight:1, sample:!!sample,
-    label: label || name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'').slice(0,20) || '파일', color: freeColor()};
+    label: label || name.replace(/\.(xlsx|xlsm|xls|csv)$/i,'').slice(0,40) || '파일', color: freeColor()};
   loadFile(f);
   return f;
 }
