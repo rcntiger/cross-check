@@ -93,9 +93,13 @@ button.small{padding:3px 9px;font-size:14px}
 .stat.hot .v{color:var(--dup)}
 .stat.near{border-color:var(--accent);background:var(--a-soft)}
 .stat.near .v{color:var(--accent)}
-.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line)}
-.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--muted);background:none}
-.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+/* 탭: 엑셀 시트 탭처럼 한 칸씩 테두리로 나눔. 고른 탭은 흰 바탕 + 위쪽 색 띠로 아래 내용과 이어짐 */
+.tabs{display:flex;flex-wrap:wrap;gap:3px;border-bottom:1px solid var(--line);padding:0 2px;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);border-bottom:none;border-top:3px solid transparent;border-radius:6px 6px 0 0;
+  padding:7px 14px 8px;margin-bottom:-1px;color:var(--muted);background:var(--bg);font-weight:500}
+.tabs button:hover{color:var(--fg);background:var(--a-soft)}
+.tabs button[aria-selected="true"]{color:var(--fg);background:var(--surface);border-top-color:var(--fc,var(--accent));
+  font-weight:700;position:relative;z-index:1;box-shadow:0 1px 0 var(--surface)}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chips button{padding:3px 10px;font-size:15px;border-radius:999px}
