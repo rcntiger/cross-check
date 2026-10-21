@@ -1053,7 +1053,7 @@ function renderResult(){
         return `<tr class="${t.n>1?'dup':''}"><td class="num">${esc(r.ref)}</td><td>${t.n>1?`<span class="pill">${t.n}개 목록</span>`:'<span class="pill no">–</span>'}${sameSheet?' <span class="pill inner">파일 안 중복</span>':''}</td><td class="refs">${refsHtml(t,fi)}${otherSheets.length?` <span class="meta">같은 파일: ${esc(refList(otherSheets))}</span>`:''}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td class="clip ad" title="${esc(c)}">${esc(c)}</td>`).join('')}</tr>`; }).join('')}
       </tbody></table></div>`;
   }
-  html += `<p class="foot">원본 행 번호 앞의 글자(A, B, C…)는 파일 카드의 글자입니다. 표시본은 원본 오른쪽에 <b>중복여부</b>, <b>다른 목록 위치</b>, <b>인근 대상물</b> 열이 붙고 중복 행은 노란색으로 칠해집니다. 원본의 셀 서식은 단순하게 바뀔 수 있으니 원본은 따로 보관하세요.</p>`;
+  html += `<p class="foot">※ 원본의 셀 서식은 단순하게 바뀔 수 있으니 원본은 따로 보관</p>`;
   box.innerHTML = html;
   box.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; if(b.dataset.setfilter) state.filter=b.dataset.setfilter; renderResult(); }));
   box.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{ state.filter=b.dataset.filter; renderResult(); }));
