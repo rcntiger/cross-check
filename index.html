@@ -965,8 +965,7 @@ function renderResult(){
     ${files.map(f=>`<button data-dl="f${f.id}" type="button" class="small">${esc(f.label)} 표시본</button>`).join('')}
   </div>
   <div class="mapdl">
-    <div><b>현장점검 지도로 보내기</b>
-      <div class="meta">현장점검 지도의 계획에서 활용. 중복은 한 곳으로 합쳐 업로드</div></div>
+    <div><b>현장점검(field-check) 앱 업로드용 파일 만들기</b></div>
     <div class="row">
       <label class="f">팀 칸에 넣을 값<select id="mapTeam">
         <option value="assign" ${state.mapTeam==='assign'?'selected':''}>배정 팀 (팀 배분 결과)</option>
