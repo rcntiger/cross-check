@@ -1100,7 +1100,7 @@ function renderResult(){
       <span class="meta">${list.length.toLocaleString()}곳${list.length>LIMIT?` · 앞의 ${LIMIT}곳만 표시`:''}</span></div>`;
     if(!list.length) html += '<div class="empty">해당하는 대상물이 없습니다.</div>';
     else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th><th>해당 구분</th>
-        ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)} <span class="meta">원본 위치</span></th>`).join('')}<th>인근 대상물</th><th>판정</th></tr></thead><tbody>
+        ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)} <span class="meta">원본 데이터</span></th>`).join('')}<th>인근 대상물</th><th>판정</th></tr></thead><tbody>
       ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td><td class="kd">${kindsOf(t).map(k=>{ const f=files[k.fi]; return `<div style="${fc(f)}"><span class="kf">${esc(f.label)}</span>${k.sheets.length?': '+esc(k.sheets.join(', ')):''}</div>`; }).join('')}</td>
         ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?t.byFile[fi].map((r,j)=>`<div class="ref">${j?'':'○ '}${esc(r.ref)}</div>`).join(''):'<span class="meta">–</span>'}</td>`).join('')}
         <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
@@ -1518,7 +1518,7 @@ function buildCombined(){
 
   // 2. 대조표: 대상물마다 각 목록에 있는지 ○
   const SC = sheetCols();
-  const mh = ['번호','대상물','주소','목록 수','해당 구분','구분 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 원본 위치`), ...SC.map(c=>c.head), '인근 대상물','판정'];
+  const mh = ['번호','대상물','주소','목록 수','해당 구분','구분 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 원본 데이터`), ...SC.map(c=>c.head), '인근 대상물','판정'];
   const mtx = [mh];
   const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(y.kindN-x.kindN)||(x.order-y.order));
   sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, t.kind, t.kindN, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])),
@@ -1540,7 +1540,7 @@ function buildCombined(){
   // 3. 중복대상: 2개 이상 목록, 목록별 정보를 한 줄에
   const head = ['번호','인근 대상물','있는 목록','해당 구분','판정'];
   const spans = [];
-  files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 원본 위치`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
+  files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 원본 데이터`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
   const dup = [head]; let n = 0;
   sorted.filter(t=>t.n>1).forEach(t=>{
     const row = [++n, t.near||'', placesText(t), t.kind, [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':'', t.brJoin?'괄호만 다름':''].filter(Boolean).join(', ')];
@@ -1565,7 +1565,7 @@ function buildCombined(){
   // 5. 배분용 전체대상: 관할센터 → 배정 팀 → 동·도로·번호 순, 같은 인근 대상물은 붙어 있음
   const A = res.alloc, multiC = A.centers.length>1;
   const ordered = allocOrdered();
-  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','해당 구분','등급', ...(impOn()?['중요']:[]), ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 원본 위치`)]];
+  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','해당 구분','등급', ...(impOn()?['중요']:[]), ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 원본 데이터`)]];
   const nearWhere = {}; res.near.forEach(g=>nearWhere[g.id]=g.where);
   ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.kind, t.grade, ...(impOn()?[isImp(t)?'○':'']:[]), ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
@@ -1578,7 +1578,7 @@ function buildCombined(){
   // 6. 팀별 시트: 팀마다 맡을 대상
   A.centers.forEach(c=>teamsOf(c.name).forEach(team=>{
     const mine = ordered.filter(t=>t.center===c.name && t.team===team);
-    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','해당 구분','등급', ...(impOn()?['중요']:[]), ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 원본 위치`),'완료','비고']];
+    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','해당 구분','등급', ...(impOn()?['중요']:[]), ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 원본 데이터`),'완료','비고']];
     mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.kind, t.grade, ...(impOn()?[isImp(t)?'○':'']:[]), ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     styleRow(ws, 0, aoa[0].length, HEAD_N);
