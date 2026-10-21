@@ -943,9 +943,11 @@ function renderResult(){
   <div class="summary">${files.map((f,fi)=>`<div class="stat" style="${fc(f)}"><div class="k">${esc(f.label)}에만 있음</div><div class="v">${res.perFile[fi].onlyT.toLocaleString()} <span class="meta">/ ${f.rows.length.toLocaleString()}행</span></div></div>`).join('')}</div>
   ${res.cands.length?`<div class="hint">철자가 비슷해서 같은 대상일 수 있는 후보가 <b>${res.cands.length}쌍</b> 있습니다. <button type="button" class="linkbtn" data-tab="fuzzy">비슷한 후보 확인하기</button></div>`:''}
   ${res.innerT?`<div class="hint">한 파일 안에 같은 대상이 두 번 이상 들어 있는 경우가 <b>${res.innerT}건</b> 있습니다. <button type="button" class="linkbtn" data-tab="matrix" data-setfilter="inner">확인하기</button></div>`:''}
-  ${res.splitNames?`<div class="meta">이름은 같지만 주소가 달라 서로 다른 대상으로 본 이름이 ${res.splitNames}개 있습니다${res.ambigT?` (주소가 없어 어느 건물인지 모르는 행이 붙은 대상 ${res.ambigT}곳은 판정 칸에 "주소 확인" 표시)`:''}.</div>`:''}
+  ${(()=>{ const msg=[];   // 같은 이름·다른 주소, 주소를 못 읽은 대상: 한 줄로
+    if(res.splitNames) msg.push(`이름은 같지만 주소가 달라 서로 다른 대상으로 분류 ${res.splitNames}개${res.ambigT?` (주소 없는 행이 붙은 ${res.ambigT}곳은 판정 칸에 "주소 확인")`:''}`);
+    if(res.unparsed) msg.push(`주소를 읽지 못한 대상 ${res.unparsed}곳은 인근 대상물에서 제외`);
+    return msg.length?`<div class="meta">${msg.join(', ')}</div>`:''; })()}
   ${res.blank?`<div class="meta">비교 기준 칸이 빈 행 ${res.blank}개(소계·안내 줄 등)는 대상물로 세지 않았습니다. 파일별 탭의 "기준값 없는 행"에서 볼 수 있습니다.</div>`:''}
-  ${res.unparsed?`<div class="meta">주소를 읽지 못한 대상 ${res.unparsed}곳은 인근 대상물에서 빠집니다. "○○로 123" 같은 도로명주소나 "○○동 123" 같은 지번주소 형식이어야 합니다.</div>`:''}
   <div class="sheetplan">
     <div class="meta">통합 결과 파일의 시트 구성</div>
     <ol>
