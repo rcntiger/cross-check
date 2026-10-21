@@ -151,8 +151,17 @@ td .meta{font-size:14px}
 .wrow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .wrow label.w{display:inline-flex;gap:6px;align-items:center;font-size:15px}
 .wrow input[type=number]{width:72px}
-.wrow.improw{flex-direction:column;align-items:flex-start;gap:6px}
-.improw .chips .meta{min-width:32px}
+.impwrap{display:grid;gap:8px}
+.impbox{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--bg);display:grid;gap:10px}
+.improw{display:grid;grid-template-columns:minmax(120px,max-content) 1fr;gap:6px 12px;align-items:start}
+.implab{font-size:14px;font-weight:600;color:var(--fc,var(--fg));padding-top:5px;display:inline-flex;align-items:center;gap:4px;max-width:260px;word-break:keep-all}
+.implab .tag{min-width:22px;height:22px;font-size:14px}
+button.pick{background:var(--surface)}
+button.pick::before{content:'☐';margin-right:5px;opacity:.7}
+button.pick[aria-pressed="true"]::before{content:'☑';opacity:1}
+.impsel{font-size:14px;border-top:1px dashed var(--line);padding-top:8px}
+.impsel .tag{min-width:20px;height:20px;font-size:13px;margin-right:3px}
+@media (max-width:640px){.improw{grid-template-columns:1fr}}
 .asum{display:grid;gap:6px}
 .asum-h{font-size:16px}
 select.tsel{padding:3px 6px}
@@ -1195,11 +1204,19 @@ function renderAlloc(){
         <option value="weight" ${state.balance==='weight'?'selected':''}>업무량 가중치로 (등급·업무 종류 반영)</option>
       </select></label>
     </div>
-    ${state.balance!=='weight' ? `<div class="wrow improw">
-      <label class="w"><input type="checkbox" id="impOn" ${state.imp.on?'checked':''}> <b>중요 대상도 팀마다 고르게</b> <span class="meta">건수는 그대로 두고, 고른 등급·구분이 한 팀에 몰리지 않게 나눔${impOn()?` · 중요 대상 <b>${A.impN.toLocaleString()}곳</b>`:''}</span></label>
-      ${state.imp.on ? `${!state.imp.grades.size && !state.imp.kinds.size ? '<span class="meta">아래에서 중요하게 볼 등급이나 구분을 고르세요 (여러 개 가능)</span>' : ''}
-      <div class="chips"><span class="meta">등급</span>${GRADES.slice(0,4).map(g=>`<button type="button" aria-pressed="${state.imp.grades.has(g)}" data-impg="${g}">${g}</button>`).join('')}</div>
-      <div class="chips"><span class="meta">구분</span>${kindOptions().map(k=>`<button type="button" aria-pressed="${state.imp.kinds.has(k)}" data-impk="${esc(k)}">${esc(k)}</button>`).join('')}</div>` : ''}
+    ${state.balance!=='weight' ? `<div class="impwrap">
+      <label class="w"><input type="checkbox" id="impOn" ${state.imp.on?'checked':''}> <b>중요 대상도 팀마다 고르게</b> <span class="meta">건수는 그대로 두고, 고른 기준에 드는 대상이 한 팀에 몰리지 않게 나눔</span></label>
+      ${state.imp.on ? `<div class="impbox">
+        <div class="imphead"><b>중요도 기준 고르기</b> <span class="meta">아래 항목을 눌러서 고르세요. 여러 개 고를 수 있고, 다시 누르면 빠집니다.</span></div>
+        <div class="improw"><span class="implab">등급</span><div class="chips">${GRADES.slice(0,4).map(g=>`<button type="button" class="pick" aria-pressed="${state.imp.grades.has(g)}" data-impg="${g}">${g}</button>`).join('')}</div></div>
+        ${files.map(f=>`<div class="improw" style="${fc(f)}"><span class="implab"><span class="tag">${letter(f)}</span>${esc(f.label)}</span><div class="chips">${
+          (f.multi ? f.parts.map(p=>[`${f.label}·${p.short}`, p.short]) : [[f.label, '목록 전체']]).map(([k,t])=>`<button type="button" class="pick" aria-pressed="${state.imp.kinds.has(k)}" data-impk="${esc(k)}">${esc(t)}</button>`).join('')}</div></div>`).join('')}
+        <div class="impsel">${impOn()
+          ? `고른 기준: ${[...GRADES.filter(g=>state.imp.grades.has(g)).map(g=>`<b>${g}</b>`),
+              ...files.flatMap(f=>(f.multi ? f.parts.map(p=>[`${f.label}·${p.short}`, p.short]) : [[f.label,'목록 전체']]).filter(([k])=>state.imp.kinds.has(k)).map(([k,t])=>`<span style="${fc(f)}"><span class="tag">${letter(f)}</span><b>${esc(t)}</b></span>`))].join(', ')}
+             → 중요 대상 <b>${A.impN.toLocaleString()}곳</b> <button type="button" class="ghost small" id="impClear">모두 빼기</button>`
+          : '<span class="meta">아직 고른 기준이 없습니다. 기준을 고르기 전에는 예전과 같이 나눕니다.</span>'}</div>
+      </div>` : ''}
     </div>` : ''}
     ${state.balance==='weight' ? `<div class="wrow">
       <span class="meta"><b>업무량 가중치</b></span>
@@ -1217,6 +1234,7 @@ function renderAlloc(){
   $('#balance').addEventListener('change',e=>{ state.balance = e.target.value; recalc(); });
   const tog = (set,v) => { set.has(v) ? set.delete(v) : set.add(v); recalc(); };
   const io = $('#impOn'); if(io) io.addEventListener('change',e=>{ state.imp.on = e.target.checked; recalc(); });
+  const ic = $('#impClear'); if(ic) ic.addEventListener('click',()=>{ state.imp.grades.clear(); state.imp.kinds.clear(); recalc(); });
   box.querySelectorAll('[data-impg]').forEach(b=>b.addEventListener('click',()=>tog(state.imp.grades, b.dataset.impg)));
   box.querySelectorAll('[data-impk]').forEach(b=>b.addEventListener('click',()=>tog(state.imp.kinds, b.dataset.impk)));
   const rm = $('#resetManual'); if(rm) rm.addEventListener('click',()=>{ state.allocOverride.clear(); recalc(); toast('손으로 바꾼 배정을 되돌렸습니다'); });
