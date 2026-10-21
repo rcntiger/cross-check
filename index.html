@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* Layout: 파일 카드들을 격자로 늘어놓고(파일마다 고유 색), 아래에 비교 항목 → 인근 묶음 → 결과(요약·대조표·내려받기) */
+/* Layout: 파일 카드들을 격자로 늘어놓고(파일마다 고유 색), 아래에 비교 항목 → 인근 대상물 → 결과(요약·대조표·내려받기) */
 :root{
   --bg:#f3f5f7; --surface:#ffffff; --line:#d9dee4; --fg:#1b232c; --muted:#5d6874;
   --accent:#1f5a8a; --accent-ink:#ffffff; --a-soft:#e3edf6; --ok:#2f7a5a; --ok-soft:#e2f1ea;
@@ -195,8 +195,8 @@ select.tsel{padding:3px 6px}
   </section>
 
   <section class="card">
-    <h2>인근 주소 묶음 <span class="meta" style="font-weight:400">팀 배분용</span></h2>
-    <p class="meta" style="margin:0;max-width:80ch">같은 도로에서 건물번호가 가까운 대상을 한 묶음으로 표시합니다. 도로명주소의 건물번호는 도로를 따라 약 10m마다 1씩 늘어나므로, 번호 차이로 거리를 어림할 수 있습니다. 지번주소는 같은 동·같은 본번일 때만 묶습니다.</p>
+    <h2>인근 대상물 <span class="meta" style="font-weight:400">팀 배분용</span></h2>
+    <p class="meta" style="margin:0;max-width:80ch">같은 도로에서 건물번호가 가까운 대상을 인근 대상물로 함께 표시합니다. 도로명주소의 건물번호는 도로를 따라 약 10m마다 1씩 늘어나므로, 번호 차이로 거리를 어림할 수 있습니다. 지번주소는 같은 동·같은 본번일 때만 인근 대상물로 봅니다.</p>
     <div class="fgrid" id="nearRow"></div>
   </section>
 
@@ -225,7 +225,7 @@ const XL_COLORS = ['1F5A8A','2F7A5A','7A4FA0','A35A16','1D7F86','B03A48','6B7A1F
 const state = {
   files: [],          // 올린 파일들 (순서 = 화면 순서)
   nItems: 1,          // 비교 항목 수 (파일마다 keys[i]로 열을 고름)
-  span: 20,           // 인근 묶음 범위(건물번호 차이), -1 = 묶지 않음
+  span: 20,           // 인근 대상물 범위(건물번호 차이), -1 = 표시 안 함
   fuzzy: 0.85, aliases: [], rejected: new Set(), mapTeam: 'assign',
   balance: 'perlist', combo: 0.75, gradeW: {'특급':2, '1급':1.5, '2급':1, '3급':1, '기타':1}, teams: {}, allocOverride: new Map(), tteam: '',
   tab: 'matrix', filter: 'dup', ffilter: 'all',
@@ -532,7 +532,7 @@ function groupNear(targets){
     flush();
   });
   return out.map((members,i)=>{
-    const id = '묶음 ' + String(i+1).padStart(2,'0');
+    const id = '인근 ' + String(i+1).padStart(2,'0');
     const from = members[0].pa.num, to = members[members.length-1].pa.num;
     const where = members[0].pa.road + ' ' + (from===to ? from : `${from}~${to}`);
     members.forEach(t=>{ t.near=id; t.rows.forEach(r=>r.near=id); });
@@ -654,7 +654,7 @@ function compare(){
   }));
   files.forEach(f=>{ f.blank = f.rows.filter(r=>r.key===null).length; });
   // 기준값이 같은 행끼리 잇는다. 옵션이 켜져 있으면 주소 번호(도로+번호)가 서로 다른 행은 따로 둔다.
-  // 주소가 없는 행은 그 이름의 가장 큰 주소 묶음에 붙인다.
+  // 주소가 없는 행은 그 이름의 가장 큰 주소 모임에 붙인다.
   const byKey = new Map();
   all.forEach(r=>{ if(r.key===null) return; let l=byKey.get(r.key); if(!l) byKey.set(r.key, l=[]); l.push(r); });
   let splitNames = 0;
@@ -715,7 +715,7 @@ function compare(){
    1) 대상마다 관할센터·등급·동·업무량을 정한다
       - 관할센터: 줄여 쓴 이름은 긴 이름에 합친다 (대응단 → 현장대응단, 시흥 → 시흥119안전센터)
       - 업무량 = (들어 있는 목록의 가중치 합) × (여러 목록이면 함께 방문 할인) × 등급 가중치
-   2) 센터마다 인근 묶음을 한 덩어리로 보고 동·도로·번호 순으로 늘어놓은 뒤,
+   2) 센터마다 인근 대상물을 한 덩어리로 보고 동·도로·번호 순으로 늘어놓은 뒤,
       업무량 누계가 팀 수만큼 고르게 나뉘는 자리에서 끊는다 (같은 지역은 같은 팀으로 이어짐)
    3) 사람이 바꾼 배정은 그대로 둔다 */
 const GRADES = ['특급','1급','2급','3급','기타'];
@@ -783,7 +783,7 @@ function runAlloc(targets, near){
   const out = [];
   centers.forEach(cname=>{
     const list = byCenter.get(cname), teams = teamsOf(cname);
-    // 덩어리 = 같은 센터 안의 인근 묶음, 또는 단독 대상
+    // 덩어리 = 같은 센터 안의 인근 대상물, 또는 단독 대상
     const units = new Map();
     list.forEach(t=>{ const k = t.near ? 'n:'+t.near : 't:'+targetKey(t); let u=units.get(k); if(!u) units.set(k, u={members:[], w:0}); u.members.push(t); u.w += t.w; });
     const sortKey = u => { const t = u.members[0]; return [t.dong || '힣', t.pa ? t.pa.road : '힣', t.pa ? t.pa.num : 1e9]; };
@@ -801,7 +801,7 @@ function runAlloc(targets, near){
       });
     }else if(state.balance==='count'){
       // 대상 수를 똑같이: 지역 순서대로 늘어놓고 개수로 정확히 나눈다 (팀 간 차이 최대 1곳)
-      // 경계에 걸린 인근 묶음만 두 팀으로 나뉠 수 있다
+      // 경계에 걸린 인근 대상물만 두 팀으로 나뉠 수 있다
       const seq = arr.flatMap(u=>u.members.slice().sort((a,b)=>(a.pa?a.pa.num:1e9)-(b.pa?b.pa.num:1e9)));
       const N = seq.length;
       seq.forEach((t,i)=>{ t.autoTeam = teams[Math.min(k-1, Math.floor(i*k/N))] || '미배정'; });
@@ -904,9 +904,9 @@ function renderItems(){
 function renderNear(){
   const box = $('#nearRow');
   if(state.files.length<2){ box.innerHTML=''; return; }
-  const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'묶지 않음']];
+  const spans = [[0,'같은 건물만'],[10,'번호 10 이내 (약 100m)'],[20,'번호 20 이내 (약 200m)'],[50,'번호 50 이내 (약 500m)'],[-1,'표시 안 함']];
   box.innerHTML = state.files.map((f,fi)=>`<label class="f" style="${fc(f)}"><span><span class="tag">${letter(f)}</span>${esc(f.label)} 주소 열</span>${colSelect(f, f.addr, `data-fi="${fi}"`, true)}</label>`).join('')
-    + `<label class="f"><span>묶음 범위</span><select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
+    + `<label class="f"><span>인근 범위</span><select id="nearSpan">${spans.map(([v,t])=>`<option value="${v}" ${v===state.span?'selected':''}>${t}</option>`).join('')}</select></label>`;
   box.querySelectorAll('select[data-fi]').forEach(s=>s.addEventListener('change',e=>{ state.files[+s.dataset.fi].addr = +e.target.value; compare(); renderResult(); }));
   $('#nearSpan').addEventListener('change',e=>{ state.span=+e.target.value; compare(); renderResult(); });
 }
@@ -938,14 +938,14 @@ function renderResult(){
     <div class="stat"><div class="k">전체 대상물 (중복 합침)</div><div class="v">${res.targets.length.toLocaleString()}</div></div>
     <div class="stat hot"><div class="k">2개 이상 목록에 있음</div><div class="v">${res.multi.toLocaleString()}</div></div>
     ${N>2?`<div class="stat hot"><div class="k">모든 목록(${N}개)에 있음</div><div class="v">${res.every.toLocaleString()}</div></div>`:''}
-    <div class="stat near"><div class="k">인근 주소 묶음</div><div class="v">${res.near.length.toLocaleString()} <span class="meta">묶음 · 대상 ${res.near.reduce((n,g)=>n+g.members.length,0)}곳</span></div></div>
+    <div class="stat near"><div class="k">인근 대상물</div><div class="v">${res.near.length.toLocaleString()} <span class="meta">개 지역 · 대상 ${res.near.reduce((n,g)=>n+g.members.length,0)}곳</span></div></div>
   </div>
   <div class="summary">${files.map((f,fi)=>`<div class="stat" style="${fc(f)}"><div class="k">${esc(f.label)}에만 있음</div><div class="v">${res.perFile[fi].onlyT.toLocaleString()} <span class="meta">/ ${f.rows.length.toLocaleString()}행</span></div></div>`).join('')}</div>
   ${res.cands.length?`<div class="hint">철자가 비슷해서 같은 대상일 수 있는 후보가 <b>${res.cands.length}쌍</b> 있습니다. <button type="button" class="linkbtn" data-tab="fuzzy">비슷한 후보 확인하기</button></div>`:''}
   ${res.innerT?`<div class="hint">한 파일 안에 같은 대상이 두 번 이상 들어 있는 경우가 <b>${res.innerT}건</b> 있습니다. <button type="button" class="linkbtn" data-tab="matrix" data-setfilter="inner">확인하기</button></div>`:''}
   ${res.splitNames?`<div class="meta">이름은 같지만 주소가 달라 서로 다른 대상으로 본 이름이 ${res.splitNames}개 있습니다${res.ambigT?` (주소가 없어 어느 건물인지 모르는 행이 붙은 대상 ${res.ambigT}곳은 판정 칸에 "주소 확인" 표시)`:''}.</div>`:''}
   ${res.blank?`<div class="meta">비교 기준 칸이 빈 행 ${res.blank}개(소계·안내 줄 등)는 대상물로 세지 않았습니다. 파일별 탭의 "기준값 없는 행"에서 볼 수 있습니다.</div>`:''}
-  ${res.unparsed?`<div class="meta">주소를 읽지 못한 대상 ${res.unparsed}곳은 묶음에서 빠집니다. "○○로 123" 같은 도로명주소나 "○○동 123" 같은 지번주소 형식이어야 합니다.</div>`:''}
+  ${res.unparsed?`<div class="meta">주소를 읽지 못한 대상 ${res.unparsed}곳은 인근 대상물에서 빠집니다. "○○로 123" 같은 도로명주소나 "○○동 123" 같은 지번주소 형식이어야 합니다.</div>`:''}
   <div class="sheetplan">
     <div class="meta">통합 결과 파일의 시트 구성</div>
     <ol>
@@ -969,7 +969,7 @@ function renderResult(){
       <label class="f">팀 칸에 넣을 값<select id="mapTeam">
         <option value="assign" ${state.mapTeam==='assign'?'selected':''}>배정 팀 (팀 배분 결과)</option>
         <option value="none" ${state.mapTeam==='none'?'selected':''}>미배정 (엑셀에서 직접 채움)</option>
-        <option value="near" ${state.mapTeam==='near'?'selected':''}>인근 묶음 번호 (지도에서 묶음별 색)</option>
+        <option value="near" ${state.mapTeam==='near'?'selected':''}>인근 대상물 번호 (지도에서 번호별 색)</option>
       </select></label>
       <button class="primary" data-dl="map" type="button">현장점검 지도용 파일 내려받기</button>
     </div>
@@ -978,7 +978,7 @@ function renderResult(){
     <button role="tab" aria-selected="${state.tab==='matrix'}" data-tab="matrix">대조표</button>
     <button role="tab" aria-selected="${state.tab==='fuzzy'}" data-tab="fuzzy">비슷한 후보${res.cands.length?` <span class="count">${res.cands.length}</span>`:''}</button>
     <button role="tab" aria-selected="${state.tab==='alloc'}" data-tab="alloc">팀 배분</button>
-    <button role="tab" aria-selected="${state.tab==='near'}" data-tab="near">인근 주소 묶음</button>
+    <button role="tab" aria-selected="${state.tab==='near'}" data-tab="near">인근 대상물</button>
     ${files.map(f=>`<button role="tab" aria-selected="${state.tab==='f'+f.id}" data-tab="f${f.id}" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</button>`).join('')}
   </div>`;
   const LIMIT = 500;
@@ -995,7 +995,7 @@ function renderResult(){
       <span class="meta">${list.length.toLocaleString()}곳${list.length>LIMIT?` · 앞의 ${LIMIT}곳만 표시`:''}</span></div>`;
     if(!list.length) html += '<div class="empty">해당하는 대상물이 없습니다.</div>';
     else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th>
-        ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</th>`).join('')}<th>인근묶음</th><th>판정</th></tr></thead><tbody>
+        ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</th>`).join('')}<th>인근 대상물</th><th>판정</th></tr></thead><tbody>
       ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td>
         ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?`<span>○ ${refList(t.byFile[fi])}</span>`:'<span class="meta">–</span>'}</td>`).join('')}
         <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
@@ -1017,7 +1017,7 @@ function renderResult(){
   }else if(state.tab==='alloc'){
     const A = res.alloc;
     const isW = state.balance==='weight';
-    html += A.centers.map(c=>`<div class="asum"><div class="asum-h"><b>${esc(c.name)}</b> <span class="meta">대상 ${c.count.toLocaleString()}곳${isW?` · 업무량 ${c.w.toLocaleString()}`:''} · 팀 ${c.teams.length}개 · 팀당 약 ${Math.round(c.count/Math.max(1,c.teams.length))}곳${c.split.length?` · 경계에서 나뉜 인근 묶음 ${c.split.length}개`:''}</span></div>
+    html += A.centers.map(c=>`<div class="asum"><div class="asum-h"><b>${esc(c.name)}</b> <span class="meta">대상 ${c.count.toLocaleString()}곳${isW?` · 업무량 ${c.w.toLocaleString()}`:''} · 팀 ${c.teams.length}개 · 팀당 약 ${Math.round(c.count/Math.max(1,c.teams.length))}곳${c.split.length?` · 경계에서 나뉜 인근 대상물 ${c.split.length}개`:''}</span></div>
       <div class="tbl" style="max-height:none"><table><thead><tr><th>팀</th><th class="num">대상</th>${files.map(f=>`<th class="num">${esc(f.label)}</th>`).join('')}<th class="num">함께 방문</th>${files.map(f=>`<th class="num">${esc(f.label)}만</th>`).join('')}${isW?'<th class="num">업무량</th>':''}<th class="num">특급</th><th class="num">1급</th><th class="num">2급</th><th class="num">3급</th><th>주요 동</th></tr></thead><tbody>
       ${c.teams.map(t=>{ const avgW = c.w/Math.max(1,c.teams.length); const dev = avgW ? Math.round((t.w-avgW)/avgW*100) : 0; return `<tr><td><b>${esc(t.name)}</b></td><td class="num"><b>${t.count}</b></td>${t.per.map(n=>`<td class="num">${n}</td>`).join('')}<td class="num">${t.multi}</td>${t.only.map(n=>`<td class="num">${n}</td>`).join('')}${isW?`<td class="num">${t.w} <span class="meta">${dev>0?'+':''}${dev}%</span></td>`:''}${t.grades.slice(0,4).map(n=>`<td class="num">${n}</td>`).join('')}<td class="clip ad" title="${esc(t.dongs)}">${esc(t.dongs)}</td></tr>`; }).join('')}
       </tbody></table></div></div>`).join('');
@@ -1026,14 +1026,14 @@ function renderResult(){
     if(state.tteam){ const [c,tn] = state.tteam.split('|'); list = list.filter(t=>t.center===c && t.team===tn); }
     html += `<div class="toolbar"><div class="chips"><button type="button" aria-pressed="${!state.tteam}" data-tteam="">전체</button>${opts.map(([k,lab])=>`<button type="button" aria-pressed="${state.tteam===k}" data-tteam="${esc(k)}">${esc(lab)}</button>`).join('')}</div>
       <span class="meta">${list.length.toLocaleString()}곳${list.length>LIMIT?` · 앞의 ${LIMIT}곳만 표시`:''}</span></div>
-      <div class="tbl"><table><thead><tr><th>배정 팀</th>${A.centers.length>1?'<th>관할센터</th>':''}<th>대상물</th><th>주소</th><th>동</th><th>있는 목록</th><th>등급</th>${isW?'<th class="num">업무량</th>':''}<th>인근묶음</th><th>목록별 위치</th></tr></thead><tbody>
+      <div class="tbl"><table><thead><tr><th>배정 팀</th>${A.centers.length>1?'<th>관할센터</th>':''}<th>대상물</th><th>주소</th><th>동</th><th>있는 목록</th><th>등급</th>${isW?'<th class="num">업무량</th>':''}<th>인근 대상물</th><th>목록별 위치</th></tr></thead><tbody>
       ${list.slice(0,LIMIT).map(t=>`<tr class="${t.n>1?'dup':''}"><td><select class="tsel" data-key="${esc(targetKey(t))}" aria-label="${esc(t.name)} 배정 팀">${teamsOf(t.center).map(n=>`<option ${n===t.team?'selected':''}>${esc(n)}</option>`).join('')}</select>${t.teamManual?' <span class="pill man">변경</span>':''}</td>
         ${A.centers.length>1?`<td>${esc(centerShort(t.center))}</td>`:''}<td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td>${esc(t.dong)}</td><td>${placesHtml(t)}</td><td>${esc(t.grade)}</td>${isW?`<td class="num">${t.w}</td>`:''}<td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td><td class="refs">${refsHtml(t,-1)}</td></tr>`).join('')}
       </tbody></table></div>`;
   }else if(state.tab==='near'){
-    if(state.span<0) html += '<div class="empty">묶음 범위가 "묶지 않음"으로 되어 있습니다.</div>';
-    else if(!res.near.length) html += '<div class="empty">가까운 주소끼리 묶인 대상이 없습니다. 주소 열과 묶음 범위를 확인해 보세요.</div>';
-    else html += `<div class="tbl"><table><thead><tr><th>묶음</th><th>위치</th><th>있는 목록</th><th>대상물</th><th>주소</th><th>원본 행</th></tr></thead><tbody>
+    if(state.span<0) html += '<div class="empty">인근 범위가 "표시 안 함"으로 되어 있습니다.</div>';
+    else if(!res.near.length) html += '<div class="empty">가까운 주소에 함께 있는 대상이 없습니다. 주소 열과 인근 범위를 확인해 보세요.</div>';
+    else html += `<div class="tbl"><table><thead><tr><th>인근 번호</th><th>위치</th><th>있는 목록</th><th>대상물</th><th>주소</th><th>원본 행</th></tr></thead><tbody>
       ${res.near.map((g,gi)=>g.members.map((t,i)=>`<tr class="${gi%2?'grp2':'grp1'}">${i===0?`<td rowspan="${g.members.length}"><b>${g.id}</b></td><td rowspan="${g.members.length}">${esc(g.where)}</td>`:''}<td>${placesHtml(t)}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="refs">${refsHtml(t,-1)}</td></tr>`).join('')).join('')}
       </tbody></table></div>`;
   }else{
@@ -1045,13 +1045,13 @@ function renderResult(){
     html += `<div class="toolbar"><div class="chips">
       ${[['all','전체'],['dup','다른 목록에도 있음'],['no',f.label+'에만'],...(f.blank?[['blank','기준값 없는 행']]:[])].map(([k,t])=>`<button aria-pressed="${state.ffilter===k}" data-ffilter="${k}" type="button">${esc(t)}</button>`).join('')}
       </div><span class="meta">${rows.length.toLocaleString()}개 행${rows.length>LIMIT?` · 앞의 ${LIMIT}개만 표시`:''}</span></div>
-      <div class="tbl"><table><thead><tr><th class="num">${f.multi?'시트·행':'행'}</th><th>중복여부</th><th>다른 목록</th><th>인근묶음</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+      <div class="tbl"><table><thead><tr><th class="num">${f.multi?'시트·행':'행'}</th><th>중복여부</th><th>다른 목록</th><th>인근 대상물</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
       ${rows.slice(0,LIMIT).map(r=>{ const t=r.target; if(t.blank) return `<tr><td class="num">${esc(r.ref)}</td><td><span class="pill no">기준값 없음</span></td><td></td><td></td>${r.cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`;
         const sameSheet = t.byFile[fi].filter(x=>x.si===r.si).length>1, otherSheets = t.byFile[fi].filter(x=>x.si!==r.si);
         return `<tr class="${t.n>1?'dup':''}"><td class="num">${esc(r.ref)}</td><td>${t.n>1?`<span class="pill">${t.n}개 목록</span>`:'<span class="pill no">–</span>'}${sameSheet?' <span class="pill inner">파일 안 중복</span>':''}</td><td class="refs">${refsHtml(t,fi)}${otherSheets.length?` <span class="meta">같은 파일: ${esc(refList(otherSheets))}</span>`:''}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td class="clip ad" title="${esc(c)}">${esc(c)}</td>`).join('')}</tr>`; }).join('')}
       </tbody></table></div>`;
   }
-  html += `<p class="foot">원본 행 번호 앞의 글자(A, B, C…)는 파일 카드의 글자입니다. 표시본은 원본 오른쪽에 <b>중복여부</b>, <b>다른 목록 위치</b>, <b>인근묶음</b> 열이 붙고 중복 행은 노란색으로 칠해집니다. 원본의 셀 서식은 단순하게 바뀔 수 있으니 원본은 따로 보관하세요.</p>`;
+  html += `<p class="foot">원본 행 번호 앞의 글자(A, B, C…)는 파일 카드의 글자입니다. 표시본은 원본 오른쪽에 <b>중복여부</b>, <b>다른 목록 위치</b>, <b>인근 대상물</b> 열이 붙고 중복 행은 노란색으로 칠해집니다. 원본의 셀 서식은 단순하게 바뀔 수 있으니 원본은 따로 보관하세요.</p>`;
   box.innerHTML = html;
   box.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; if(b.dataset.setfilter) state.filter=b.dataset.setfilter; renderResult(); }));
   box.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{ state.filter=b.dataset.filter; renderResult(); }));
@@ -1237,7 +1237,7 @@ function markSheet(fi, pi){
   const hr = p.headerRow - 1;
   ws[enc({r:hr,c:c1})] = {t:'s',v:'중복여부',s:HEAD};
   ws[enc({r:hr,c:c2})] = {t:'s',v:'다른 목록 위치',s:HEAD};
-  ws[enc({r:hr,c:c3})] = {t:'s',v:'인근묶음',s:{...NEAR}};
+  ws[enc({r:hr,c:c3})] = {t:'s',v:'인근 대상물',s:{...NEAR}};
   f.rows.filter(r=>r.part===pi).forEach(row=>{
     const r = row.excelRow - 1;
     if(row.near) ws[enc({r,c:c3})] = {t:'s',v:row.near,s:NEAR};
@@ -1263,7 +1263,7 @@ function markSheet(fi, pi){
 /* 여러 시트를 합친 파일: 통합 결과에는 합친 표 한 장으로 넣는다 */
 function mergedMarkSheet(fi){
   const f = state.files[fi];
-  const aoa = [['시트','원본 행','중복여부','다른 목록 위치','인근묶음', ...f.headers]];
+  const aoa = [['시트','원본 행','중복여부','다른 목록 위치','인근 대상물', ...f.headers]];
   const marks = [];
   f.rows.forEach(row=>{
     const m = markInfo(row, fi);
@@ -1391,7 +1391,7 @@ function buildCombined(){
   XLSX.utils.book_append_sheet(wb, wsA, safeSheetName('팀배분 요약', used));
 
   // 2. 대조표: 대상물마다 각 목록에 있는지 ○
-  const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 위치`), '인근묶음','판정'];
+  const mh = ['번호','대상물','주소','목록 수', ...files.map(f=>f.label), ...files.map(f=>`${f.label} 위치`), '인근 대상물','판정'];
   const mtx = [mh];
   const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(x.order-y.order));
   sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])), t.near||'',
@@ -1404,7 +1404,7 @@ function buildCombined(){
   XLSX.utils.book_append_sheet(wb, wsM, safeSheetName('대조표', used));
 
   // 3. 중복대상: 2개 이상 목록, 목록별 정보를 한 줄에
-  const head = ['번호','인근묶음','있는 목록','판정'];
+  const head = ['번호','인근 대상물','있는 목록','판정'];
   const spans = [];
   files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 위치`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
   const dup = [head]; let n = 0;
@@ -1420,7 +1420,7 @@ function buildCombined(){
 
   // 4. 파일마다 그 목록에만 있는 대상
   files.forEach((f,fi)=>{
-    const aoa = [[f.multi?'원본 위치(시트 행)':'원본 행','인근묶음','비슷한 후보(확인 필요)', ...f.headers]];
+    const aoa = [[f.multi?'원본 위치(시트 행)':'원본 행','인근 대상물','비슷한 후보(확인 필요)', ...f.headers]];
     f.rows.filter(r=>r.target.n===1).forEach(r=>aoa.push([f.multi ? r.ref : r.excelRow, r.near||'', r.candTxt||'', ...r.cells]));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     styleRow(ws, 0, aoa[0].length, headOf(f));
@@ -1428,10 +1428,10 @@ function buildCombined(){
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`${f.label}에만`, used));
   });
 
-  // 5. 배분용 전체대상: 관할센터 → 배정 팀 → 동·도로·번호 순, 같은 인근 묶음은 붙어 있음
+  // 5. 배분용 전체대상: 관할센터 → 배정 팀 → 동·도로·번호 순, 같은 인근 대상물은 붙어 있음
   const A = res.alloc, multiC = A.centers.length>1;
   const ordered = allocOrdered();
-  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','등급', ...(state.balance==='weight'?['업무량']:[]),'인근묶음','묶음 범위', ...files.map(f=>`${f.label} 위치`)]];
+  const dist = [['관할센터','배정 팀','대상물','주소','동','있는 목록','목록 수','등급', ...(state.balance==='weight'?['업무량']:[]),'인근 대상물','인근 범위', ...files.map(f=>`${f.label} 위치`)]];
   const nearWhere = {}; res.near.forEach(g=>nearWhere[g.id]=g.where);
   ordered.forEach(t=>dist.push([t.center, t.team, t.name, t.addr, t.dong, placesText(t), t.n, t.grade, ...(state.balance==='weight'?[t.w]:[]), t.near||'', t.near?nearWhere[t.near]:'', ...files.map((f,fi)=>refList(t.byFile[fi]))]));
   const wsX = XLSX.utils.aoa_to_sheet(dist);
@@ -1444,7 +1444,7 @@ function buildCombined(){
   // 6. 팀별 시트: 팀마다 맡을 대상
   A.centers.forEach(c=>teamsOf(c.name).forEach(team=>{
     const mine = ordered.filter(t=>t.center===c.name && t.team===team);
-    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','등급', ...(isW?['업무량']:[]),'인근묶음', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
+    const aoa = [['번호','대상물','주소','동','할 일(있는 목록)','등급', ...(isW?['업무량']:[]),'인근 대상물', ...files.map(f=>`${f.label} 위치`),'완료','비고']];
     mine.forEach((t,i)=>aoa.push([i+1, t.name, t.addr, t.dong, placesText(t), t.grade, ...(isW?[t.w]:[]), t.near||'', ...files.map((f,fi)=>refList(t.byFile[fi])), '', '']));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     styleRow(ws, 0, aoa[0].length, HEAD_N);
