@@ -117,6 +117,8 @@ td.clip.nm{max-width:240px}
 td.clip.ad{max-width:220px}
 td.kd{min-width:200px;max-width:300px;white-space:normal;line-height:1.45}
 td.kd .kf{font-weight:600;color:var(--fc)}
+td.refs .ref{white-space:nowrap}
+td.refs .ref+.ref{padding-left:1.2em}
 tr.dup td{background:var(--dup-bg)}
 .pill{display:inline-block;font-size:14px;font-weight:600;padding:0 8px;border-radius:999px;background:var(--dup);color:var(--surface)}
 .pill.no{background:transparent;color:var(--muted);font-weight:400;padding:0}
@@ -458,7 +460,7 @@ function loadFile(f){
   f.parts.forEach((p,pi)=>p.rows.forEach(r=>{
     const cells = new Array(H).fill('');
     r.cells.forEach((v,c)=>{ if(String(v).trim()!=='' || cells[p.map[c]]==='') cells[p.map[c]] = v; });
-    f.rows.push({excelRow:r.excelRow, part:pi, si:p.si, cells, ref: f.multi ? `${p.short} ${r.excelRow}` : String(r.excelRow)});
+    f.rows.push({excelRow:r.excelRow, part:pi, si:p.si, cells, ref: f.multi ? `${p.short} 시트 ${r.excelRow}행` : `${r.excelRow}행`});   // 예: '특급대상 시트 4행'
   }));
   f.keys = []; f.addr = null; f.centerCol = null; f.gradeCol = null;   // 열 선택은 다시 추측
 }
@@ -648,8 +650,8 @@ function findCands(){
   out.forEach(c=>{
     const pct = Math.round(c.sim*100);
     const fa = state.files[c.a.fi], fb = state.files[c.b.fi];
-    c.a.candTxt += (c.a.candTxt?', ':'') + `${fb.label} ${c.b.ref}행(${pct}%)`;
-    c.b.candTxt += (c.b.candTxt?', ':'') + `${fa.label} ${c.a.ref}행(${pct}%)`;
+    c.a.candTxt += (c.a.candTxt?', ':'') + `${fb.label} ${c.b.ref}(${pct}%)`;
+    c.b.candTxt += (c.b.candTxt?', ':'') + `${fa.label} ${c.a.ref}(${pct}%)`;
   });
   return out;
 }
@@ -1100,7 +1102,7 @@ function renderResult(){
     else html += `<div class="tbl"><table><thead><tr><th class="num">#</th><th>대상물</th><th>주소</th><th class="num">목록 수</th><th>해당 구분</th>
         ${files.map(f=>`<th class="fcol" style="${fc(f)}"><span class="tag">${letter(f)}</span>${esc(f.label)}</th>`).join('')}<th>인근 대상물</th><th>판정</th></tr></thead><tbody>
       ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td><td class="kd">${kindsOf(t).map(k=>{ const f=files[k.fi]; return `<div style="${fc(f)}"><span class="kf">${esc(f.label)}</span>${k.sheets.length?': '+esc(k.sheets.join(', ')):''}</div>`; }).join('')}</td>
-        ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?`<span>○ ${refList(t.byFile[fi])}</span>`:'<span class="meta">–</span>'}</td>`).join('')}
+        ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?t.byFile[fi].map((r,j)=>`<div class="ref">${j?'':'○ '}${esc(r.ref)}</div>`).join(''):'<span class="meta">–</span>'}</td>`).join('')}
         <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
         <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}${t.addrAmbig?' <span class="pill inner">주소 확인</span>':''}${t.brJoin?' <span class="pill" title="괄호 안 글자만 다르고 주소가 같아 같은 대상으로 봄">괄호만 다름</span>':''}</td></tr>`).join('')}
       </tbody></table></div>`;
@@ -1108,7 +1110,7 @@ function renderResult(){
     if(state.fuzzy<0) html += '<div class="empty">오타 의심 후보 찾기가 꺼져 있습니다. 비교 기준의 옵션에서 켤 수 있습니다.</div>';
     else if(!res.cands.length) html += '<div class="empty">철자가 비슷한 후보가 없습니다.</div>';
     else{
-      const cell = r => { const f=files[r.fi]; return `<td style="${fc(f)}"><span class="tag">${letter(f)}</span> ${esc(f.keys.map(i=>r.cells[i]).join(' / '))}<div class="meta">${esc(f.label)} ${esc(r.ref)}행${r.addrTxt?' · '+esc(r.addrTxt):''}</div></td>`; };
+      const cell = r => { const f=files[r.fi]; return `<td style="${fc(f)}"><span class="tag">${letter(f)}</span> ${esc(f.keys.map(i=>r.cells[i]).join(' / '))}<div class="meta">${esc(f.label)} ${esc(r.ref)}${r.addrTxt?' · '+esc(r.addrTxt):''}</div></td>`; };
       html += `<div class="toolbar"><span class="meta">글자를 자음·모음 단위로 쪼개 비교한 유사도입니다. 주소까지 같으면 같은 대상일 가능성이 높습니다.</span>
           <button type="button" data-allok>보이는 후보 모두 같은 대상으로</button></div>
         <div class="tbl"><table><thead><tr><th class="num">유사도</th><th>목록 1</th><th>목록 2</th><th>주소</th><th>판정</th></tr></thead><tbody>
@@ -1148,7 +1150,7 @@ function renderResult(){
     html += `<div class="toolbar"><div class="chips">
       ${[['all','전체'],['dup','다른 목록에도 있음'],['no',f.label+'에만'],...(f.blank?[['blank','기준값 없는 행']]:[])].map(([k,t])=>`<button aria-pressed="${state.ffilter===k}" data-ffilter="${k}" type="button">${esc(t)}</button>`).join('')}
       </div><span class="meta">${rows.length.toLocaleString()}개 행${rows.length>LIMIT?` · 앞의 ${LIMIT}개만 표시`:''}</span></div>
-      <div class="tbl"><table><thead><tr><th class="num">${f.multi?'시트·행':'행'}</th><th>중복여부</th><th>다른 목록</th><th>인근 대상물</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+      <div class="tbl"><table><thead><tr><th class="num">${f.multi?'원본 위치':'행'}</th><th>중복여부</th><th>다른 목록</th><th>인근 대상물</th>${f.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
       ${rows.slice(0,LIMIT).map(r=>{ const t=r.target; if(t.blank) return `<tr><td class="num">${esc(r.ref)}</td><td><span class="pill no">기준값 없음</span></td><td></td><td></td>${r.cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`;
         const sameSheet = t.byFile[fi].filter(x=>x.si===r.si).length>1, otherSheets = t.byFile[fi].filter(x=>x.si!==r.si);
         return `<tr class="${t.n>1?'dup':''}"><td class="num">${esc(r.ref)}</td><td>${t.n>1?`<span class="pill">${t.n}개 목록</span>`:'<span class="pill no">–</span>'}${sameSheet?' <span class="pill inner">파일 안 중복</span>':''}</td><td class="refs">${refsHtml(t,fi)}${otherSheets.length?` <span class="meta">같은 파일: ${esc(refList(otherSheets))}</span>`:''}</td><td>${r.near?`<span class="nearchip">${r.near}</span>`:''}</td>${r.cells.map(c=>`<td class="clip ad" title="${esc(c)}">${esc(c)}</td>`).join('')}</tr>`; }).join('')}
@@ -1335,7 +1337,7 @@ function finishTable(ws, aoa){
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(aoa.length-1,0),c:Math.max(aoa[0].length-1,0)}})};
   ws['!freeze'] = {xSplit:0,ySplit:1};
 }
-const otherText = (t, fi) => t.inFiles.filter(x=>x!==fi).map(x=>`${state.files[x].label} ${refList(t.byFile[x])}행`).join(' / ');
+const otherText = (t, fi) => t.inFiles.filter(x=>x!==fi).map(x=>`${state.files[x].label} ${refList(t.byFile[x])}`).join(' / ');
 const placesText = t => t.inFiles.map(x=>state.files[x].label).join(', ');
 
 /* 표시 내용: 중복여부 · 다른 목록 위치 (같은 파일의 다른 시트도 함께) */
@@ -1347,7 +1349,7 @@ function markInfo(row, fi){
   const sameSheet = mine.filter(x=>x.si===row.si), otherSheet = mine.filter(x=>x.si!==row.si);
   if(t.n<2 && !mine.length) return null;
   const label = t.n>1 ? `중복(${t.n}개 목록)` + (sameSheet.length?' · 파일 안 중복':'') : (sameSheet.length ? '파일 안 중복' : '같은 파일 다른 시트');
-  const where = [otherText(t,fi), mine.length ? `같은 파일 ${refList(mine)}행` : ''].filter(Boolean).join(' / ');
+  const where = [otherText(t,fi), mine.length ? `같은 파일 ${refList(mine)}` : ''].filter(Boolean).join(' / ');
   return {label, where, dup: t.n>1};
 }
 /* 원본 시트 한 장 + 표시 */
@@ -1451,7 +1453,7 @@ function buildFieldCheck(){
     const team = state.mapTeam==='assign' ? teamFull(t) : state.mapTeam==='near' ? (g ? g.id : '단독') : '미배정';
     const note = [`해당 구분: ${t.kind}`];
     if(g) note.push(`${g.id}(${g.where})`);
-    note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}행`).join(' / '));
+    note.push(t.inFiles.map(x=>`${files[x].label} ${refList(t.byFile[x])}`).join(' / '));
     const kind = t.inFiles.map(x=>files[x].label).join('·');
     const info = fcInfo(t);
     // 지도는 빈 칸을 위 칸 값으로 채우므로(병합 셀 처리) 모르는 값은 '-'로 둠 → 지도에서는 '-'를 빈 값으로 봄
