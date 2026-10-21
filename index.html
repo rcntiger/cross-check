@@ -966,7 +966,7 @@ function renderResult(){
   </div>
   <div class="mapdl">
     <div><b>현장점검(field-check) 앱 업로드용 파일 만들기</b>
-      <div class="meta">현장점검(field-check) 맵 앱의 업로드용으로 이름·주소·팀·구분·관할센터·등급·용도·비고 8개 열로 된 Excel 파일을 만듭니다. 접속 주소 <a href="https://rcntiger.github.io/field-check/" target="_blank" rel="noopener">https://rcntiger.github.io/field-check/</a></div></div>
+      <div class="meta">현장점검(field-check) 맵 앱의 업로드용으로 이름·주소·팀·구분·관할센터·등급·용도·전화번호·비고 9개 열로 된 Excel 파일을 만듭니다. 접속 주소 <a href="https://rcntiger.github.io/field-check/" target="_blank" rel="noopener">https://rcntiger.github.io/field-check/</a></div></div>
     <div class="row">
       <label class="f">파일의 팀열에 표시할 값<select id="mapTeam">
         <option value="assign" ${state.mapTeam==='assign'?'selected':''}>배정 팀 (팀 배분 결과)</option>
@@ -1305,6 +1305,7 @@ function stamp(withTime){
    - 구분 열: 대상이 든 목록 이름(예: 조사 / 훈련 / 조사·훈련) → 지도에서 마커 모양·구분 필터로 씀
    - 관할센터·등급·용도: 원본 목록에서 가져와 지도 정보카드에 보여 줄 수 있게 함 (열 이름이 지도의 이름·주소·팀 키워드와 겹치지 않음) */
 function useColOf(f){ return f.headers.findIndex(h=>/용도/.test(norm(h))); }
+function telColOf(f){ return f.headers.findIndex(h=>/전화|연락처|tel|phone/i.test(norm(h)) && !/팩스|fax/i.test(norm(h))); }
 function fcInfo(t){
   const files = state.files;
   const first = col => { for(const r of t.rows){ const i = col(files[r.fi]); if(i!=null && i>=0){ const v = String(r.cells[i] ?? '').trim(); if(v) return v; } } return ''; };
@@ -1313,12 +1314,12 @@ function fcInfo(t){
   let grade = '';
   t.rows.forEach(r=>{ const f=files[r.fi]; if(f.gradeCol!=null && f.gradeCol>=0){ const g=gradeOf(r.cells[f.gradeCol]); if(g!=='기타' && (!grade || GRADES.indexOf(g)<GRADES.indexOf(grade))) grade=g; } });
   if(!grade) grade = first(f=>f.gradeCol);
-  return { center, grade, use: first(useColOf) };
+  return { center, grade, use: first(useColOf), tel: first(telColOf) };
 }
 function buildFieldCheck(){
   const files = state.files;
   const title = `현장점검 지도용 · ${files.map(f=>f.label).join(' + ')} · ${stamp()}`;
-  const HEAD = ['이름','주소','팀','구분','관할센터','등급','용도','비고'], NC = HEAD.length;
+  const HEAD = ['이름','주소','팀','구분','관할센터','등급','용도','전화번호','비고'], NC = HEAD.length;
   const rows = [[title,...Array(NC-1).fill('')], HEAD];
   let skipped = 0, gi = -1, last = null;
   const bands = [];
@@ -1335,7 +1336,7 @@ function buildFieldCheck(){
     const info = fcInfo(t);
     // 지도는 빈 칸을 위 칸 값으로 채우므로(병합 셀 처리) 모르는 값은 '-'로 둠 → 지도에서는 '-'를 빈 값으로 봄
     const v = x => x || '-';
-    rows.push([name, t.addr, team, kind, v(info.center), v(info.grade), v(info.use), note.join(' · ')]);
+    rows.push([name, t.addr, team, kind, v(info.center), v(info.grade), v(info.use), v(info.tel), note.join(' · ')]);
     if(state.mapTeam==='assign'){ const k=t.center+'|'+t.team; if(k!==last){ gi++; last=k; } bands.push(gi%2); }
     else if(g){ if(g!==last){ gi++; last=g; } bands.push(gi%2); } else bands.push(-1);
   });
