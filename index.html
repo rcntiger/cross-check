@@ -967,7 +967,7 @@ function renderResult(){
   <div class="mapdl">
     <div><b>현장점검(field-check) 앱 업로드용 파일 만들기</b></div>
     <div class="row">
-      <label class="f">팀 칸에 넣을 값<select id="mapTeam">
+      <label class="f">파일의 팀열에 표시할 값<select id="mapTeam">
         <option value="assign" ${state.mapTeam==='assign'?'selected':''}>배정 팀 (팀 배분 결과)</option>
         <option value="none" ${state.mapTeam==='none'?'selected':''}>미배정 (엑셀에서 직접 채움)</option>
         <option value="near" ${state.mapTeam==='near'?'selected':''}>인근 대상물 번호 (지도에서 번호별 색)</option>
