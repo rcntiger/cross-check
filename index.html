@@ -513,6 +513,7 @@ function keyOf(cells, idxs){
 }
 function parseAddr(s){
   if(!s) return null;
+  s = String(s).replace(/(로|길)\s+(\d+[가-힣]?(?:번)?길)/g,'$1$2');   // '시흥대로 47길' → '시흥대로47길'
   let m = s.match(/([가-힣0-9]+(?:로|길))\s*(\d+)/);
   if(m) return {kind:'R', road:m[1], num:+m[2]};
   m = s.match(/([가-힣0-9]+(?:동|가|리))\s*(?:산\s*)?(\d+)/);
@@ -576,10 +577,13 @@ function addrKey(pa){ return pa ? pa.kind+'|'+pa.road+'|'+pa.num : null; }
 function findCands(){
   const thr = state.fuzzy; if(thr<0) return [];
   const files = state.files, out = [];
-  for(let a=0;a<files.length;a++) for(let b=a+1;b<files.length;b++){
-    // 이미 서로의 파일과 연결된 대상은 빼고, 아직 짝이 없는 행끼리만 비교
-    const PA = files[a].rows.filter(r=>r.key!==null && !r.target.byFile[b].length).map(r=>prepFuzzy(r,files[a]));
-    const PB = files[b].rows.filter(r=>r.key!==null && !r.target.byFile[a].length).map(r=>prepFuzzy(r,files[b]));
+  for(let a=0;a<files.length;a++) for(let b=a;b<files.length;b++){
+    const same = a===b;
+    if(same && !files[a].multi) continue;
+    // 다른 파일끼리: 이미 서로의 파일과 연결된 대상은 빼고, 아직 짝이 없는 행끼리만 비교
+    // 같은 파일(시트가 여러 개)끼리: 다른 시트에 있고 아직 다른 대상인 행끼리 비교
+    const PA = files[a].rows.filter(r=>r.key!==null && (same || !r.target.byFile[b].length)).map(r=>prepFuzzy(r,files[a]));
+    const PB = same ? PA : files[b].rows.filter(r=>r.key!==null && !r.target.byFile[a].length).map(r=>prepFuzzy(r,files[b]));
     if(!PA.length || !PB.length) continue;
     const index = new Map(), byAddr = new Map();
     PB.forEach((p,i)=>{
@@ -593,6 +597,9 @@ function findCands(){
       const consider = (i, addrSame) => {
         if(seen.has(i)) return; seen.set(i, 1);
         const pb = PB[i];
+        if(same && (pb.r.si===pa.r.si || pb.r.target===pa.r.target || pb.r.rid<=pa.r.rid
+          // 이미 상대 시트에 짝이 있는 행은 빼기 (예: 시흥초·신흥초가 각자 짝이 있으면 서로 후보 아님)
+          || pa.r.target.byFile[a].some(x=>x.si===pb.r.si) || pb.r.target.byFile[a].some(x=>x.si===pa.r.si))) return;
         if(!pb.j.length || pa.digits !== pb.digits) return;
         const L = Math.max(pa.j.length, pb.j.length);
         const sim = 1 - lev(pa.j,pb.j)/L;
@@ -683,6 +690,28 @@ function compare(){
     groups.forEach(g=>{ g.forEach(r=>union(r.rid, g[0].rid)); if(!big || g.length>big.length) big = g; });
     list.forEach(r=>{ if(!ak(r)){ union(r.rid, big[0].rid); r.addrAmbig = true; } });
   });
+  // 괄호만 덧붙은 이름: 'A'와 'A(…)'가 주소(도로·번호)까지 같으면 같은 대상
+  //   예: 서울정심초등학교 = 서울정심초등학교(병설유 포함), 호압사 = 호압사(석불좌상)
+  //   괄호 없는 이름이 없거나 괄호 내용이 여러 가지면(가산디지털단지역(7호선)/(국철)) 합치지 않음 → 비슷한 후보로
+  const brGroups = new Map();
+  all.forEach(r=>{
+    if(r.key===null || !r.pa) return;
+    const f = files[r.fi], raw = String(r.cells[f.keys[0]] ?? '');
+    if(!raw.trim()) return;
+    const core = normalize(raw.replace(/\([^)]*\)|（[^）]*）/g,''));
+    if(!core) return;
+    const k = core+'#'+addrKey(r.pa);
+    let g = brGroups.get(k); if(!g) brGroups.set(k, g={plain:[], br:new Map()});
+    if(/[(（]/.test(raw)) { const bk=normalize(raw); let l=g.br.get(bk); if(!l) g.br.set(bk, l=[]); l.push(r); }
+    else g.plain.push(r);
+  });
+  let brJoined = 0;
+  brGroups.forEach(g=>{
+    if(!g.plain.length || g.br.size!==1) return;
+    const brs = [...g.br.values()][0];
+    if(find(brs[0].rid)===find(g.plain[0].rid)) return;
+    brs.forEach(r=>{ union(r.rid, g.plain[0].rid); r.brJoin = true; }); brJoined++;
+  });
   const manual = new Set();
   state.aliases.forEach(([x,y])=>{ if(parent.has(x) && parent.has(y)){ union(x,y); manual.add(x); manual.add(y); } });
   const comp = new Map();
@@ -698,6 +727,7 @@ function compare(){
       multiSheet: byFile.some(a=>new Set(a.map(r=>r.si)).size>1),
       manual: rows.some(r=>manual.has(r.rid)),
       addrAmbig: rows.some(r=>r.addrAmbig),
+      brJoin: rows.some(r=>r.brJoin) && new Set(rows.map(r=>r.key)).size>1,
       name: ff.keys.map(i=>first.cells[i]).join(' / '),
       name1: String(first.cells[ff.keys[0]] ?? '').trim(),
       addr: (rows.find(r=>r.addrTxt)||{}).addrTxt || '',
@@ -725,7 +755,7 @@ function compare(){
     manualT: targets.filter(t=>t.manual && t.n>1).length,
     unparsed: targets.filter(t=>t.addr && !t.pa).length,
     blank: files.reduce((n,f)=>n+f.blank,0),
-    splitNames, ambigT: targets.filter(t=>t.addrAmbig).length};
+    splitNames, ambigT: targets.filter(t=>t.addrAmbig).length, brJoined};
 }
 
 /* ---------- 팀 배분 ----------
@@ -1021,7 +1051,7 @@ function renderResult(){
       ${list.slice(0,LIMIT).map((t,i)=>`<tr class="${t.n>1?'dup':''}"><td class="num">${i+1}</td><td class="clip nm" title="${esc(t.name)}">${esc(t.name)}</td><td class="clip ad" title="${esc(t.addr)}">${esc(t.addr)}</td><td class="num"><b>${t.n}</b></td><td class="kd">${kindsOf(t).map(k=>{ const f=files[k.fi]; return `<div style="${fc(f)}"><span class="kf">${esc(f.label)}</span>${k.sheets.length?': '+esc(k.sheets.join(', ')):''}</div>`; }).join('')}</td>
         ${files.map((f,fi)=>`<td class="refs mark" style="${fc(f)}">${t.byFile[fi].length?`<span>○ ${refList(t.byFile[fi])}</span>`:'<span class="meta">–</span>'}</td>`).join('')}
         <td>${t.near?`<span class="nearchip">${t.near}</span>`:''}</td>
-        <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}${t.addrAmbig?' <span class="pill inner">주소 확인</span>':''}</td></tr>`).join('')}
+        <td>${t.manual?`<span class="pill man">직접 확정</span> <button type="button" class="ghost small" data-unalias="${t.rows.map(r=>r.rid).join(',')}">취소</button>`:''}${t.inner?' <span class="pill inner">파일 안 중복</span>':''}${t.addrAmbig?' <span class="pill inner">주소 확인</span>':''}${t.brJoin?' <span class="pill" title="괄호 안 글자만 다르고 주소가 같아 같은 대상으로 봄">괄호만 다름</span>':''}</td></tr>`).join('')}
       </tbody></table></div>`;
   }else if(state.tab==='fuzzy'){
     if(state.fuzzy<0) html += '<div class="empty">오타 의심 후보 찾기가 꺼져 있습니다. 비교 기준의 옵션에서 켤 수 있습니다.</div>';
@@ -1421,7 +1451,7 @@ function buildCombined(){
   const sorted = res.targets.slice().sort((x,y)=>(y.n-x.n)||(y.kindN-x.kindN)||(x.order-y.order));
   sorted.forEach((t,i)=>mtx.push([i+1, t.name, t.addr, t.n, t.kind, t.kindN, ...files.map((f,fi)=>t.byFile[fi].length?'○':''), ...files.map((f,fi)=>refList(t.byFile[fi])),
     ...SC.map(c=>t.byFile[c.fi].some(r=>r.part===c.pi)?'○':''), t.near||'',
-    [t.manual?'직접 확정':'', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')]));
+    [t.manual?'직접 확정':'', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':'', t.brJoin?'괄호만 다름':''].filter(Boolean).join(', ')]));
   const wsM = XLSX.utils.aoa_to_sheet(mtx);
   styleRow(wsM, 0, mh.length, HEAD_N);
   const M0 = 6, S0 = M0+files.length*2;   // 목록 ○ 칸 시작, 시트 ○ 칸 시작
@@ -1441,7 +1471,7 @@ function buildCombined(){
   files.forEach(f=>{ spans.push([head.length, head.length+f.headers.length, f]); head.push(`${f.label} 위치`, ...f.headers.map(h=>`[${f.label}] ${h}`)); });
   const dup = [head]; let n = 0;
   sorted.filter(t=>t.n>1).forEach(t=>{
-    const row = [++n, t.near||'', placesText(t), t.kind, [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':''].filter(Boolean).join(', ')];
+    const row = [++n, t.near||'', placesText(t), t.kind, [t.manual?'직접 확정':'자동 일치', t.inner?'파일 안 중복':'', t.addrAmbig?'주소 확인':'', t.brJoin?'괄호만 다름':''].filter(Boolean).join(', ')];
     files.forEach((f,fi)=>{ const r = t.byFile[fi][0]; row.push(refList(t.byFile[fi]), ...f.headers.map((_,c)=> r ? r.cells[c] : '')); });
     dup.push(row);
   });
